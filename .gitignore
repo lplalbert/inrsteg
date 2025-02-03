@@ -1,0 +1,11 @@
+FastTools
+data
+.vscode
+__pycache__
+*.pyc
+*.png
+*.jpg
+output
+liif
+*.ckpt
+

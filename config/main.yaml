@@ -1,0 +1,39 @@
+name: "ismark_final_v13_level_4"
+root_dir: "./output"
+gpus: [2, 3]
+batch_size: 32
+num_workers: 32
+max_epochs: 2000
+find_unused_parameters: false
+ckpt_path: null #"/home/sn/workspace/inrsteg/output/ismark_final_v10/lightning_logs/version_1/checkpoints/ckpt-epoch=1839-val_loss=0.0042.ckpt"
+lr: 0.001
+n_val_epoch: 5
+seed: 42
+
+img_size: 128
+msg_len: 30
+feat_dim: 256
+hidden_dim: 128
+coord_map_dim: 32
+decoder_blocks: 2
+min_scale: 0.06
+
+use_bg: true
+
+# 好像没啥用了
+use_fold: true
+cache: false
+use_global: false
+
+
+use_cell: false # 不能加，加了就会导致不同尺度下解码不同了
+tunable_decoder: true
+fixed_psnr: null
+inject_rgb: true
+noised: true
+use_jnd: true
+
+
+w_msg: 1
+w_img: 10
+w_lpips: 0.1
