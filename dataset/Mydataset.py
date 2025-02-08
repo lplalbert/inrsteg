@@ -41,9 +41,9 @@ class MyDataset(LDataset):
         self.use_global = args.use_global
         self.use_cell = args.use_cell
         if valid:
-            self.data_path = "/data/sn/datasets/DIV2K/DIV2K_valid_HR"
+            self.data_path = "/home/light_sun/workspace/inrsteg/data/DIV2K_valid"
         else:
-            self.data_path = "/data/sn/datasets/DIV2K/DIV2K_train_HR"
+            self.data_path = "/home/light_sun/workspace/inrsteg/data/DIV2K_train"
         self.files = os.listdir(self.data_path)
         self.cache = args.cache     
         self.global_ts = transforms.Compose([

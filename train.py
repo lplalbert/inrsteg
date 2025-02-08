@@ -1,8 +1,8 @@
 import torch
 from FastTools.util.TrainUtil import Args
 # from model.inr_steg_v4 import INRMark, train
-from model.ismark_final_v13 import INRMarkTrainer
+from model.ismark_v1 import INRMarkTrainer
 
 # train()
 
-INRMarkTrainer("/home/sn/workspace/inrsteg/config/main.yaml").train()
+INRMarkTrainer("/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/main.yaml").train()

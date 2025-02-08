@@ -1,11 +1,11 @@
-name: "ismark_final_v13_level_4"
+name: "ismark_v1_fix_psnr_36_alpha_0.04"
 root_dir: "./output"
 gpus: [2, 3]
 batch_size: 32
 num_workers: 32
 max_epochs: 2000
 find_unused_parameters: false
-ckpt_path: null #"/home/sn/workspace/inrsteg/output/ismark_final_v10/lightning_logs/version_1/checkpoints/ckpt-epoch=1839-val_loss=0.0042.ckpt"
+ckpt_path: "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_fix_psnr_38/lightning_logs/version_1/checkpoints/ckpt-epoch=239-val_loss=0.0049.ckpt"
 lr: 0.001
 n_val_epoch: 5
 seed: 42
@@ -28,12 +28,12 @@ use_global: false
 
 use_cell: false # 不能加，加了就会导致不同尺度下解码不同了
 tunable_decoder: true
-fixed_psnr: null
+fixed_psnr: 38
 inject_rgb: true
 noised: true
 use_jnd: true
-
+alpha: 0.04 # 原始是0.1
 
 w_msg: 1
-w_img: 10
+w_img: 1
 w_lpips: 0.1
