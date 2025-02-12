@@ -1,13 +1,13 @@
-name: "ismark_v1_fix_psnr_36_alpha_0.04"
+name: "ismark_v1_valid_128_alpha_0.02_min_scale_1"
 root_dir: "./output"
 gpus: [2, 3]
 batch_size: 32
 num_workers: 32
-max_epochs: 2000
+max_epochs: 20000
 find_unused_parameters: false
-ckpt_path: "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_fix_psnr_38/lightning_logs/version_1/checkpoints/ckpt-epoch=239-val_loss=0.0049.ckpt"
+ckpt_path: null #"/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_valid_128_psnr_36_alpha_0.04/lightning_logs/version_0/checkpoints/ckpt-epoch=149-val_loss=0.1759.ckpt"
 lr: 0.001
-n_val_epoch: 5
+n_val_epoch: 1
 seed: 42
 
 img_size: 128
@@ -16,7 +16,7 @@ feat_dim: 256
 hidden_dim: 128
 coord_map_dim: 32
 decoder_blocks: 2
-min_scale: 0.06
+min_scale: 1 # 1
 
 use_bg: true
 
@@ -28,12 +28,12 @@ use_global: false
 
 use_cell: false # 不能加，加了就会导致不同尺度下解码不同了
 tunable_decoder: true
-fixed_psnr: 38
+# fixed_psnr: 36
 inject_rgb: true
 noised: true
 use_jnd: true
-alpha: 0.04 # 原始是0.1
+alpha: 0.02 # 原始是0.1
 
 w_msg: 1
-w_img: 1
-w_lpips: 0.1
+w_img: 0
+w_lpips: 0.

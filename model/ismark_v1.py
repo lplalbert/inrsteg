@@ -21,6 +21,7 @@ from FastTools.steganography.utils.common import msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
 from dataset.Mydataset import MyDataset, generate_grid_coordinates
+from model.lpips import REC_LPIPS
 
 
 
@@ -224,13 +225,14 @@ class INRMark(EngineModel):
             ("Cropout", None),
 
             ("Color", None),
-            ("KorniaJpeg", None),
+            ("KorniaJpeg", {"min_q": 50, "max_q": 60}),
             ("GaussianFilter", None),
             ("GaussianNoise", None),
 
         ])
         
         # Metrics
+        # self.lpips = REC_LPIPS()
         # self.lpips = LPIPS(net='vgg')
 
     def render_img(self, 
@@ -313,6 +315,7 @@ class INRMark(EngineModel):
         msg_loss = F.mse_loss(predict_msg, msg) * self.w_msg
         
         img_loss = F.mse_loss(wm_img, cover_img) * self.w_img 
+        # lpips_loss = self.lpips(wm_img*2-1,cover_img*2-1) * self.w_lpips
         # lpips_loss = self.w_lpips * torch.mean(self.lpips.forward(wm_img*2-1,cover_img*2-1))
 
 
@@ -350,7 +353,8 @@ class INRMark(EngineModel):
         predict_msg = res['predict_msg']
         
         msg_loss = F.mse_loss(predict_msg, msg) * self.w_msg
-        img_loss = F.mse_loss(wm_img, cover_img) * self.w_img        
+        img_loss = F.mse_loss(wm_img, cover_img) * self.w_img    
+        # lpips_loss = self.lpips(wm_img*2-1,cover_img*2-1) * self.w_lpips
         # lpips_loss = self.w_lpips * torch.mean(self.lpips.forward(wm_img*2-1,cover_img*2-1))
 
         loss = msg_loss + img_loss # + lpips_loss
@@ -371,7 +375,7 @@ class INRMark(EngineModel):
 class INRMarkTrainer(EngineTrainer):
 
     def build_dataset(self, cfg):
-        return MyDataset(cfg, data_len=50000), MyDataset(cfg, data_len=100)
+        return MyDataset(cfg, data_len=10000), MyDataset(cfg, data_len=100)
     
     
     def build_model(self, cfg):

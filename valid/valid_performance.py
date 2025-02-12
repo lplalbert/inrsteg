@@ -2,6 +2,7 @@ from tqdm import tqdm
 from FastTools.dataset.dataset import read_img
 from FastTools.metre import PSNR
 from FastTools.metric.ssim import SSIM
+from FastTools.steganography.Noiser.Noiser import Noiser
 from FastTools.steganography.utils.common import gen_random_msg, msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
@@ -10,7 +11,7 @@ from model.ismark_v1 import INRMark
 import os
 from torchvision import transforms, utils
 cfg_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/main.yaml"
-ckpt_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_fix_psnr_36_alpha_0.04/lightning_logs/version_0/checkpoints/ckpt-epoch=19-val_loss=0.0123.ckpt"
+ckpt_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_valid_128_psnr_36_alpha_0.04/lightning_logs/version_0/checkpoints/ckpt-epoch=149-val_loss=0.1759.ckpt"
 
 device = "cuda:0"
 args = Args().load(cfg_path)
@@ -18,7 +19,7 @@ model = INRMark.load_from_checkpoint(ckpt_path, args=args).to(device).eval()
 
 data_path = "/home/light_sun/workspace/inrsteg/data/DIV2K_valid"
 imgs = os.listdir(data_path)
-fixed_psnr = 38
+fixed_psnr = 35
 
 ts = transforms.Compose([
     transforms.ToTensor(),
@@ -29,6 +30,15 @@ total_acc = 0
 total_psnr = 0
 total_ssim = 0
 n = 0
+noiser = Noiser(
+    [
+        # ("Identity", None),
+        # ("GaussianNoise", {"std": 0.05}),
+        ("KorniaJpeg", {"min_q": 50, "max_q": 51}),
+        # ("Crop", None),
+        # ("Rotate", None),
+    ]
+)
 for img in tqdm(imgs):
     img_path = os.path.join(data_path, img)
     img = read_img(img_path)
@@ -38,8 +48,8 @@ for img in tqdm(imgs):
     wm_img, mask = model.render_img(coords, msg, img)
     if fixed_psnr:
         wm_img = clip_psnr(wm_img, img, fixed_psnr, over_clip=True)
-
-    predict_msg = model.decoder(wm_img)
+    noised_img, _ = noiser(wm_img, img)
+    predict_msg = model.decoder(noised_img)
     acc = msg_acc(predict_msg, msg)
     psnr = PSNR(wm_img, img)
     ssim = SSIM(wm_img, img)
