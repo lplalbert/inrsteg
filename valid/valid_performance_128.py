@@ -10,6 +10,9 @@ from dataset.Mydataset import MyDataset, generate_grid_coordinates
 from model.ismark_v1 import INRMark
 import os
 from torchvision import transforms, utils
+
+# 仅在128尺度上进行验证
+
 cfg_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/main.yaml"
 ckpt_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_valid_128_alpha_0.02_min_scale_1/lightning_logs/version_25/checkpoints/ckpt-epoch=504-val_loss=0.0355.ckpt"
 
@@ -33,9 +36,22 @@ n = 0
 noiser = Noiser(
     [
         # ("Identity", None),
+        # ("GaussianNoise", {"std": 0.01}),
         # ("GaussianNoise", {"std": 0.05}),
-        ("KorniaJpeg", {"min_q": 50, "max_q": 51}),
-        # ("Crop", None),
+        # ("KorniaJpeg", {"min_q": 50, "max_q": 51}),
+        # ("KorniaJpeg", {"min_q": 60, "max_q": 61}),
+        # ("KorniaJpeg", {"min_q": 80, "max_q": 81}),
+        # ("Crop", {"ratio": [0.6, 0.6]}),
+        # ("Crop", {"ratio": [0.8, 0.8]}),
+        # ("Cropout", {"ratio": [0.1, 0.1]}),
+        # ("Cropout", {"ratio": [0.05, 0.05]}),
+        # ("Dropout", {"prob": [0.1, 0.1]}),
+        # ("Dropout", {"prob": [0.3, 0.3]}),
+        # ("Color", {"brightness": [0.5, 0.5], "saturation": [0, 0], "hue": [0, 0], "combine":True})
+        # ("Rotate", {"angle": [30, 30]})
+        # ("Translate", {"translation": [0.1, 0.1]}),
+        # ("Scale", {"scale_factor": [1.2, 1.2]})
+        # ("GaussianFilter", {"sigma": [2, 2]})
         # ("Rotate", None),
     ]
 )

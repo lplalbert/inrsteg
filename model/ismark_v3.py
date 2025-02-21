@@ -1,4 +1,5 @@
 # Standard library imports
+import math
 from typing import Optional, Tuple
 
 # Third-party imports
@@ -20,11 +21,85 @@ from FastTools.steganography.Noiser.Noiser import Noiser
 from FastTools.steganography.utils.common import msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
+from FastTools.util.utils import weights_init
 from dataset.Mydataset import MyDataset, generate_grid_coordinates
-from model.ffc import FFCNet, FourierUnit
 from model.lpips import REC_LPIPS
 
-# 这是在128x128上训练的？
+# 这是alpha0.02的效果， fix psnr 36
+# 在lowrank里面添加更多的正则来帮助学习
+# 加深网络
+
+
+class SEBlock(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SEBlock, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
+
+
+class FourierUnit(nn.Module):
+    def __init__(self, in_channels, out_channels, groups=1):
+        super().__init__()
+        self.groups = groups
+        
+        # 调整通道数处理：输入输出通道数翻倍（实部+虚部）
+        self.conv_layer = nn.Conv2d(
+            in_channels=in_channels * 2,  # 处理实部和虚部
+            out_channels=out_channels * 2,
+            kernel_size=1,
+            groups=self.groups,
+            bias=False
+        )
+        self.bn = nn.BatchNorm2d(out_channels * 2)
+        self.relu = nn.ReLU(inplace=True)
+        
+        self.out_layer = nn.Sequential(
+            nn.Conv2d(out_channels+in_channels, out_channels, 3, 1, 1),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        batch, c, h, w = x.shape
+        
+        # 新版FFT处理
+        # 步骤1：执行FFT变换
+        fft = torch.fft.rfft2(x, norm='ortho')  # 输出复数张量 [B,C,H,W//2+1]
+        
+        # 分离实部和虚部
+        real = fft.real  # [B,C,H,W//2+1]
+        imag = fft.imag  # [B,C,H,W//2+1]
+        
+        # 拼接实部虚部作为通道维度
+        fft_combined = torch.cat([real, imag], dim=1)  # [B, 2*C, H, W//2+1]
+        
+        # 步骤2：频域卷积处理
+        fft_processed = self.conv_layer(fft_combined)  # [B, 2*out_C, H, W//2+1]
+        fft_processed = self.relu(self.bn(fft_processed))
+        
+        # 拆分处理后的实部虚部
+        real_new, imag_new = torch.chunk(fft_processed, 2, dim=1)  # 各[B, out_C, H, W//2+1]
+        
+        # 步骤3：逆FFT变换
+        fft_new = torch.complex(real_new, imag_new)  # 重建复数张量
+        output = torch.fft.irfft2(fft_new, s=(h, w), norm='ortho')  # [B, out_C, H, W]
+        output = self.out_layer(torch.cat([output, x], dim=1))
+        return output
+
+
+
 class FourierFeatMapping(nn.Module):
     # 基于理论Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains
     def __init__(self, in_dim, map_scale=16, map_size=4, tunable=False):
@@ -64,10 +139,10 @@ class LowRankFusionBlock(nn.Module):
         self.x_fc = nn.Linear(self.x_dim, self.rank_dim, bias=False)
         self.y_fc = nn.Linear(self.y_dim, self.rank_dim, bias=False)
         self.out_fc = nn.Linear(self.rank_dim, self.out_dim, bias=False)
-        self.act = nn.LeakyReLU(0.1, True)
+        self.act = nn.GELU()
         self.bn = nn.BatchNorm1d(self.rank_dim)
         self.bn2 = nn.BatchNorm1d(self.rank_dim)
-        self.bn3 = nn.BatchNorm1d(self.out_dim)
+        self.bn3 = nn.BatchNorm1d(self.out_dim) #nn.LayerNorm(self.out_dim)
         self.k = nn.Linear(x_dim, self.out_dim, bias=False) if self.out_dim != x_dim else nn.Identity()
         # self.fc = LinearBlock(self.out_dim, self.out_dim, 'bn', 'lrelu')
         pass
@@ -82,6 +157,8 @@ class LowRankFusionBlock(nn.Module):
         x = self.bn(x)
         y = self.y_fc(y)
         y = self.bn2(y)
+        y = self.act(y)
+        
         z = x * y
         z = self.out_fc(z)
         z = self.bn3(z)
@@ -151,7 +228,7 @@ class FeatureGrid(nn.Module):
         
         # Create multi-resolution grids
         self.grids = nn.ParameterList([
-            nn.Parameter(torch.randn(1, feat_dim, img_size // 2**i, img_size // 2**i))
+            nn.Parameter(math.sqrt(img_size) * torch.randn(1, feat_dim, img_size // 2**i, img_size // 2**i))
             for i in range(level)
         ])
 
@@ -160,9 +237,11 @@ class FeatureGrid(nn.Module):
         
         self.out_layer = nn.Sequential(
             nn.Linear(hidden_dim, out_dim),
-            # nn.LayerNorm(out_dim),
-            nn.LeakyReLU(0.2, True),
-        ) if out_dim is not None else nn.Identity()
+            nn.BatchNorm1d(out_dim),
+            # nn.LeakyReLU(0.2, True),
+            nn.GELU(),
+            # nn.Linear(out_dim * 2, out_dim),
+        )
 
 
         self.addition_fourier_feat = addition_fourier_feat
@@ -194,12 +273,12 @@ class FeatureGrid(nn.Module):
             grid = grid.expand(batch_size, -1, -1, -1)
             feat = F.grid_sample(grid, coords.flip(-1), 
                                align_corners=True, mode=self.sample_mode)
-            feat = rearrange(feat, 'b c h w -> b (h w) c')
+            feat = rearrange(feat, 'b c h w -> (b h w) c')
             feats.append(feat)
             
         if self.addition_fourier_feat:
                 fourier_feat = self.fourier_mapper(coords).permute(0, 3, 1, 2)
-                fourier_feat = rearrange(fourier_feat, 'b c h w -> b (h w) c')
+                fourier_feat = rearrange(fourier_feat, 'b c h w -> (b h w) c')
                 feats.append(fourier_feat)
                 pass
         feats = torch.cat(feats, dim=-1)
@@ -222,7 +301,7 @@ class INRMark(EngineModel):
         self.msg_len = args.msg_len
         self.level_dim = 32
         self.level_num = 8
-        self.msg_dim = 64
+        self.msg_dim = 128
         self.rank_dim = 64
         self.alpha = args.alpha
         # Loss weights
@@ -247,9 +326,19 @@ class INRMark(EngineModel):
         self.msg_encoder = MLP(
             in_dim=self.msg_len,
             out_dim=self.msg_dim,
+            # hidden_dim=256,
             num_hidden_layers=2,
             norm='bn'
         )
+        
+        # self.msg_encoder = nn.Sequential(
+        #     nn.Linear(self.msg_len, self.msg_dim),
+        #     nn.GELU(),
+        #     nn.Linear(self.msg_dim, self.msg_dim),
+        #     nn.GELU(),
+        #     nn.Linear(self.msg_dim, self.msg_dim),
+        #     nn.GELU(),
+        # )
         
         self.inr = nn.ModuleList([
             LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
@@ -257,8 +346,8 @@ class INRMark(EngineModel):
             LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
             LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
             
-            # LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
-            # LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
+            LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
+            LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
             # LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
             # LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim)
         ])
@@ -275,6 +364,8 @@ class INRMark(EngineModel):
         #     norm='bn',
         #     act='relu'
         # )
+        
+        # self.inr.apply(weights_init("xavier"))
         
         # Augmentation
         self.noiser = Noiser([
@@ -318,11 +409,11 @@ class INRMark(EngineModel):
         bs, h, w, c = coords.size()
         n = h * w
         # Sample structural features
-        struct_feat = self.struct_embedding(coords) # [b n c]
-        struct_feat = rearrange(struct_feat, "b n c -> (b n) c")
+        struct_feat = self.struct_embedding(coords) # [(b n) c]
+        # struct_feat = rearrange(struct_feat, "b n c -> (b n) c")
 
         # Message transformation
-        msg_feat = self.msg_encoder(msg)
+        msg_feat = self.msg_encoder(msg*2-1)
         msg_feat = msg_feat.unsqueeze(1).repeat(1, n, 1) # [b n c]
         msg_feat = rearrange(msg_feat, "b n c -> (b n) c")
         for layer in self.inr:
