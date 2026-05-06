@@ -37,9 +37,10 @@ def read_img(img_path: str, mode: str = "RGB") -> Image.Image:
     return Image.open(img_path).convert(mode)
 
 
-def image_to_tensor(img: Image.Image, size: int) -> torch.Tensor:
-    resample = getattr(Image, "Resampling", Image).BICUBIC
-    img = img.resize((size, size), resample=resample)
+def image_to_tensor(img: Image.Image, carrier_size: int = 0) -> torch.Tensor:
+    if carrier_size and carrier_size > 0:
+        resample = getattr(Image, "Resampling", Image).BICUBIC
+        img = img.resize((carrier_size, carrier_size), resample=resample)
     arr = np.asarray(img).astype(np.float32) / 255.0
     tensor = torch.from_numpy(arr).permute(2, 0, 1)
     return tensor.clamp(0, 1)
@@ -137,71 +138,47 @@ def generate_grid_coordinates(top_left, side_length, grid_size=128):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Local INRMark embedding/extraction test with random crop visual metrics."
+        description="INRMark template-resize embedding eval with timing statistics."
     )
-    parser.add_argument(
-        "--cfg",
-        default="./config/v6_30bit_true.yaml",
-        help="Path to yaml config.",
-    )
+    parser.add_argument("--cfg", default="./config/v6_30bit_true.yaml", help="Path to yaml config.")
     parser.add_argument(
         "--ckpt",
-        default = "output/ismark_v6_30bit_true/lightning_logs/version_5/checkpoints/ckpt-epoch=1819-val_loss=0.0034.ckpt",
-        # default="./output/ismark_v6_30bit_true/lightning_logs/version_5/checkpoints/last.ckpt",
-        help="Checkpoint path. Defaults to cfg.ckpt_path, with local ./output fallback.",
+        default="output/ismark_v6_30bit_true/lightning_logs/version_5/checkpoints/last.ckpt",
+        help="Checkpoint path. Defaults to cfg.ckpt_path if omitted.",
     )
-    parser.add_argument(
-        "--model-module",
-        default="model.ismark_v6_30bit",
-        help="Python module that exports INRMark.",
-    )
-    parser.add_argument(
-        "--img-dir",
-        default="/mnt/xsj2023/Datasets/DIV2K/DIV2K_valid",
-        help="Directory of clean images.",
-    )
-    parser.add_argument(
-        "--out-dir",
-        default="./local_watermark_crop_eval",
-        help="Directory for samples, summary.csv and summary.json.",
-    )
-    parser.add_argument(
-        "--stats-dir",
-        default=None,
-        help="Only summarize an existing result directory that contains summary.csv/crops.csv.",
-    )
+    parser.add_argument("--model-module", default="model.ismark_v6_30bit")
+    parser.add_argument("--img-dir", default="/mnt/xsj2023/Datasets/DIV2K/DIV2K_valid")
+    parser.add_argument("--out-dir", default="./inr_eval")
+    parser.add_argument("--stats-dir", default=None)
     parser.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--num-images", type=int, default=100, help="0 means all images.")
-    parser.add_argument("--num-crops", type=int, default=10, help="Random crops per image.")
-    parser.add_argument("--image-size", type=int, default=2048, help="Square render/eval size.")
-    parser.add_argument("--crop-size", type=int, default=128, help="Random crop size.")
-    parser.add_argument("--decode-size", type=int, default=None, help="Decoder input size.")
-    parser.add_argument("--patch-size", type=int, default=128, help="Render patch size.")
-    parser.add_argument("--overlap", type=int, default=0, help="Render patch overlap.")
-    parser.add_argument("--fixed-psnr", type=float, default=None, help="Optional PSNR clipping target.")
-    parser.add_argument("--message", default=None, help="Binary message. Defaults to random.")
+    parser.add_argument("--num-crops", type=int, default=10)
     parser.add_argument(
-        "--per-image-msg",
-        action="store_true",
-        help="Generate a new random message for every image.",
-    )
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument(
-        "--keep-proxy-env",
-        action="store_true",
-        help="Keep HTTP(S)/ALL proxy environment variables before importing the model.",
-    )
-    parser.add_argument(
-        "--save-limit",
+        "--template-size",
         type=int,
-        default=5,
-        help="Number of images for which visual samples are saved. 0 disables samples.",
+        default=2048,
+        help="Square size used to render the watermark template before resizing it to the carrier image.",
     )
+    parser.add_argument(
+        "--carrier-size",
+        type=int,
+        default=0,
+        help="0 keeps each carrier image at its original size; positive values resize carrier to square size.",
+    )
+    parser.add_argument("--crop-size", type=int, default=128)
+    parser.add_argument("--decode-size", type=int, default=None)
+    parser.add_argument("--patch-size", type=int, default=128)
+    parser.add_argument("--overlap", type=int, default=0)
+    parser.add_argument("--fixed-psnr", type=float, default=None)
+    parser.add_argument("--message", default=None)
+    parser.add_argument("--per-image-msg", action="store_true")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--keep-proxy-env", action="store_true")
+    parser.add_argument("--save-limit", type=int, default=5)
     return parser.parse_args()
 
 
 def clear_proxy_env() -> Dict[str, str]:
-    """Avoid optional Lightning/Gradio imports crashing on unsupported proxy schemes."""
     proxy_keys = [
         "http_proxy",
         "https_proxy",
@@ -289,6 +266,19 @@ def make_patch_starts(length: int, patch_size: int, overlap: int) -> List[int]:
     return starts
 
 
+def sync_device(device: str) -> None:
+    if str(device).startswith("cuda") and torch.cuda.is_available():
+        torch.cuda.synchronize(torch.device(device))
+
+
+def timed_call(device: str, fn, *args, **kwargs):
+    sync_device(device)
+    start = time.perf_counter()
+    result = fn(*args, **kwargs)
+    sync_device(device)
+    return result, (time.perf_counter() - start) * 1000.0
+
+
 @torch.no_grad()
 def render_watermark_template(
     model,
@@ -313,27 +303,21 @@ def render_watermark_template(
             output[:, :, h_start:h_end, w_start:w_end] += wm_patch
             count_map[:, :, h_start:h_end, w_start:w_end] += 1
 
-    output = output / count_map.clamp_min(1)
-    return output
+    return output / count_map.clamp_min(1)
 
 
-def apply_watermark_template(
+def apply_watermark_template_to_carrier(
     img: torch.Tensor,
     watermark_template: torch.Tensor,
     fixed_psnr: float = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    max_size = max(img.size(2), img.size(3))
+    _, _, img_h, img_w = img.shape
     watermark = F.interpolate(
         watermark_template,
-        size=(max_size, max_size),
+        size=(img_h, img_w),
         mode="bilinear",
         align_corners=False,
     )
-    img_h, img_w = img.size(2), img.size(3)
-    wm_h, wm_w = watermark.size(2), watermark.size(3)
-    h_start = (wm_h - img_h) // 2
-    w_start = (wm_w - img_w) // 2
-    watermark = watermark[:, :, h_start : h_start + img_h, w_start : w_start + img_w]
 
     if watermark.shape != img.shape:
         raise ValueError(f"Watermark shape {watermark.shape} != image shape {img.shape}")
@@ -364,7 +348,7 @@ def random_crop_pair(
 
 @torch.no_grad()
 def decode_bits(model, img: torch.Tensor, decode_size: int, msg_len: int) -> Tuple[str, torch.Tensor]:
-    if img.shape[-2:] != (decode_size, decode_size):
+    if decode_size and img.shape[-2:] != (decode_size, decode_size):
         img = F.interpolate(img, size=(decode_size, decode_size), mode="bilinear", align_corners=False)
     pred = model.decode_msg(img)
     return tensor_to_bits(pred, msg_len), pred
@@ -404,10 +388,10 @@ def metric_stats(values: List[float]) -> Dict[str, float]:
 
 def print_metric_stats(title: str, stats: Dict[str, Dict[str, float]]) -> None:
     print(f"\n[{title}]")
-    print(f"{'metric':<22} {'count':>8} {'mean':>12} {'var':>12} {'std':>12} {'min':>12} {'max':>12}")
+    print(f"{'metric':<26} {'count':>8} {'mean':>12} {'var':>12} {'std':>12} {'min':>12} {'max':>12}")
     for name, item in stats.items():
         print(
-            f"{name:<22} "
+            f"{name:<26} "
             f"{int(item['count']):>8} "
             f"{item['mean']:>12.6f} "
             f"{item['var']:>12.6f} "
@@ -445,9 +429,11 @@ def summarize_result_dir(result_dir: str) -> Dict[str, Dict[str, Dict[str, float
             "crop_ssim_mean",
             "crop_bit_acc_mean",
             "crop_bit_acc_min",
+            "embed_ms",
+            "full_extract_ms",
         ],
     )
-    crop_values = read_csv_numeric_columns(result_path / "crops.csv", ["psnr", "ssim", "bit_acc"])
+    crop_values = read_csv_numeric_columns(result_path / "crops.csv", ["psnr", "ssim", "bit_acc", "extract_ms"])
 
     summary_stats = {key: metric_stats(value) for key, value in summary_values.items()}
     crop_stats = {
@@ -455,6 +441,7 @@ def summarize_result_dir(result_dir: str) -> Dict[str, Dict[str, Dict[str, float
         "crop_ssim": metric_stats(crop_values["ssim"]),
         "crop_bit_acc": metric_stats(crop_values["bit_acc"]),
         "crop_ber": metric_stats([1 - value for value in crop_values["bit_acc"]]),
+        "crop_extract_ms": metric_stats(crop_values["extract_ms"]),
     }
 
     print_metric_stats("summary.csv per-image stats", summary_stats)
@@ -510,33 +497,40 @@ def main() -> None:
     out_dir = Path(cli.out_dir) / time.strftime("%Y%m%d-%H%M%S")
     sample_dir = out_dir / "samples"
     out_dir.mkdir(parents=True, exist_ok=True)
+
     msg_len = int(cfg.msg_len)
     decode_size = int(cli.decode_size or cfg.img_size)
-    print("[local_watermark_crop_eval] cfg_path =", cli.cfg)
-    print("[local_watermark_crop_eval] ckpt_path =", ckpt_path)
-    print("[local_watermark_crop_eval] model_module =", cli.model_module)
-    print("[local_watermark_crop_eval] msg_len =", msg_len)
-    print("[local_watermark_crop_eval] image_size =", cli.image_size)
-    print("[local_watermark_crop_eval] crop_size =", cli.crop_size)
-    print("[local_watermark_crop_eval] decode_size =", decode_size)
     fixed_msg = None
     if cli.message:
         fixed_msg = message_to_tensor(cli.message, msg_len)
     elif not cli.per_image_msg:
         fixed_msg = gen_random_msg(msg_len)
 
-    coords = generate_grid_coordinates((-1, -1), 2, cli.image_size).unsqueeze(0).to(cli.device)
+    print("[inr_eval] cfg_path =", cli.cfg)
+    print("[inr_eval] ckpt_path =", ckpt_path)
+    print("[inr_eval] model_module =", cli.model_module)
+    print("[inr_eval] msg_len =", msg_len)
+    print("[inr_eval] template_size =", cli.template_size)
+    print("[inr_eval] carrier_size =", "original" if cli.carrier_size <= 0 else cli.carrier_size)
+    print("[inr_eval] crop_size =", cli.crop_size)
+    print("[inr_eval] decode_size =", decode_size)
+
+    coords = generate_grid_coordinates((-1, -1), 2, cli.template_size).unsqueeze(0).to(cli.device)
+    template_times = []
     fixed_template = None
     if fixed_msg is not None:
-        fixed_template = render_watermark_template(
-            model=model,
-            coords=coords,
-            msg=fixed_msg.unsqueeze(0).to(cli.device),
-            patch_size=cli.patch_size,
-            overlap=cli.overlap,
+        fixed_template, template_ms = timed_call(
+            cli.device,
+            render_watermark_template,
+            model,
+            coords,
+            fixed_msg.unsqueeze(0).to(cli.device),
+            cli.patch_size,
+            cli.overlap,
         )
-    image_paths = list_images(cli.img_dir, cli.num_images)
+        template_times.append(template_ms)
 
+    image_paths = list_images(cli.img_dir, cli.num_images)
     rows: List[Dict] = []
     crop_rows: List[Dict] = []
     summary_values = {
@@ -547,33 +541,57 @@ def main() -> None:
         "crop_ssim": [],
         "crop_acc": [],
     }
+    time_values = {
+        "template_gen_ms": template_times,
+        "embed_ms": [],
+        "full_extract_ms": [],
+        "crop_extract_ms": [],
+    }
 
     for img_index, img_path in enumerate(tqdm(image_paths, desc="Evaluating images")):
         msg = gen_random_msg(msg_len) if cli.per_image_msg else fixed_msg.clone()
         msg = msg.unsqueeze(0).to(cli.device)
         msg_str = tensor_to_bits(msg, msg_len)
-        watermark_template = fixed_template
-        if cli.per_image_msg:
-            watermark_template = render_watermark_template(
-                model=model,
-                coords=coords,
-                msg=msg,
-                patch_size=cli.patch_size,
-                overlap=cli.overlap,
-            )
 
-        clean = read_img(img_path)
-        clean = image_to_tensor(clean, cli.image_size).unsqueeze(0).to(cli.device)
-        watermarked, residual = apply_watermark_template(
-            img=clean,
-            watermark_template=watermark_template,
-            fixed_psnr=cli.fixed_psnr,
+        watermark_template = fixed_template
+        template_ms = 0.0
+        if cli.per_image_msg:
+            watermark_template, template_ms = timed_call(
+                cli.device,
+                render_watermark_template,
+                model,
+                coords,
+                msg,
+                cli.patch_size,
+                cli.overlap,
+            )
+            time_values["template_gen_ms"].append(template_ms)
+
+        clean_pil = read_img(img_path)
+        clean = image_to_tensor(clean_pil, cli.carrier_size).unsqueeze(0).to(cli.device)
+        carrier_h, carrier_w = clean.shape[-2:]
+
+        (watermarked, residual), embed_ms = timed_call(
+            cli.device,
+            apply_watermark_template_to_carrier,
+            clean,
+            watermark_template,
+            cli.fixed_psnr,
         )
+        time_values["embed_ms"].append(embed_ms)
 
         full_psnr = float(psnr(watermarked, clean).item())
         full_ssim = float(ssim(watermarked, clean).item())
-        full_bits, full_pred = decode_bits(model, watermarked, decode_size, msg_len)
+        (full_bits, full_pred), full_extract_ms = timed_call(
+            cli.device,
+            decode_bits,
+            model,
+            watermarked,
+            decode_size,
+            msg_len,
+        )
         full_acc = float(msg_acc(full_pred, msg).item())
+        time_values["full_extract_ms"].append(full_extract_ms)
         summary_values["full_psnr"].append(full_psnr)
         summary_values["full_ssim"].append(full_ssim)
         summary_values["full_acc"].append(full_acc)
@@ -581,6 +599,7 @@ def main() -> None:
         crop_accs = []
         crop_psnrs = []
         crop_ssims = []
+        crop_extract_mses = []
         first_clean_crop = None
         first_wm_crop = None
         first_crop_bits = ""
@@ -588,7 +607,14 @@ def main() -> None:
 
         for crop_index in range(cli.num_crops):
             clean_crop, wm_crop, crop_meta = random_crop_pair(clean, watermarked, cli.crop_size)
-            crop_bits, crop_pred = decode_bits(model, wm_crop, decode_size, msg_len)
+            (crop_bits, crop_pred), crop_extract_ms = timed_call(
+                cli.device,
+                decode_bits,
+                model,
+                wm_crop,
+                decode_size,
+                msg_len,
+            )
             crop_acc = float(msg_acc(crop_pred, msg).item())
             crop_psnr = float(psnr(wm_crop, clean_crop).item())
             crop_ssim = float(ssim(wm_crop, clean_crop).item())
@@ -596,6 +622,8 @@ def main() -> None:
             crop_accs.append(crop_acc)
             crop_psnrs.append(crop_psnr)
             crop_ssims.append(crop_ssim)
+            crop_extract_mses.append(crop_extract_ms)
+            time_values["crop_extract_ms"].append(crop_extract_ms)
             summary_values["crop_acc"].append(crop_acc)
             summary_values["crop_psnr"].append(crop_psnr)
             summary_values["crop_ssim"].append(crop_ssim)
@@ -617,6 +645,7 @@ def main() -> None:
                     "psnr": crop_psnr,
                     "ssim": crop_ssim,
                     "bit_acc": crop_acc,
+                    "extract_ms": crop_extract_ms,
                     "target_msg": msg_str,
                     "decoded_msg": crop_bits,
                 }
@@ -624,6 +653,8 @@ def main() -> None:
 
         row = {
             "image": os.path.basename(img_path),
+            "carrier_height": int(carrier_h),
+            "carrier_width": int(carrier_w),
             "target_msg": msg_str,
             "full_decoded_msg": full_bits,
             "first_crop_decoded_msg": first_crop_bits,
@@ -634,6 +665,10 @@ def main() -> None:
             "crop_ssim_mean": mean(crop_ssims),
             "crop_bit_acc_mean": mean(crop_accs),
             "crop_bit_acc_min": min(crop_accs) if crop_accs else 0.0,
+            "template_gen_ms": template_ms,
+            "embed_ms": embed_ms,
+            "full_extract_ms": full_extract_ms,
+            "crop_extract_ms_mean": mean(crop_extract_mses),
             "first_crop_top": first_crop_meta.get("top", 0),
             "first_crop_left": first_crop_meta.get("left", 0),
         }
@@ -654,7 +689,14 @@ def main() -> None:
     write_csv(out_dir / "summary.csv", rows)
     write_csv(out_dir / "crops.csv", crop_rows)
 
-    stats = {key: metric_stats(value) for key, value in summary_values.items()}
+    metric_stats_map = {key: metric_stats(value) for key, value in summary_values.items()}
+    time_stats_map = {key: metric_stats(value) for key, value in time_values.items()}
+    total_extract_times = time_values["full_extract_ms"] + time_values["crop_extract_ms"]
+    time_stats_map["extract_ms_all_calls"] = metric_stats(total_extract_times)
+
+    timing_means = {key: mean(value) for key, value in time_values.items()}
+    timing_means["extract_ms_all_calls"] = mean(total_extract_times)
+
     summary = {
         "cfg": cli.cfg,
         "ckpt": ckpt_path,
@@ -662,18 +704,22 @@ def main() -> None:
         "img_dir": cli.img_dir,
         "num_images": len(image_paths),
         "num_crops_per_image": cli.num_crops,
-        "image_size": cli.image_size,
+        "template_size": cli.template_size,
+        "carrier_size": cli.carrier_size,
         "crop_size": cli.crop_size,
         "decode_size": decode_size,
         "msg_len": msg_len,
         "fixed_message": tensor_to_bits(fixed_msg.unsqueeze(0), msg_len) if fixed_msg is not None else None,
         "metrics": {key: mean(value) for key, value in summary_values.items()},
-        "metric_stats": stats,
+        "metric_stats": metric_stats_map,
+        "timing": timing_means,
+        "timing_stats": time_stats_map,
     }
     with (out_dir / "summary.json").open("w") as f:
         json.dump(summary, f, indent=2)
 
-    print_metric_stats("evaluation stats", stats)
+    print_metric_stats("evaluation stats", metric_stats_map)
+    print_metric_stats("timing stats milliseconds", time_stats_map)
     print(f"Saved results to: {out_dir}")
 
 

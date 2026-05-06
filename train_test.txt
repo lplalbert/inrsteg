@@ -1,2 +1,29 @@
 train
 CUDA_VISIBLE_DEVICES=0,1 python train.py
+
+\
+
+python local_watermark_crop_eval.py \
+  --cfg ./config/v6_30bit_true.yaml \
+  --model-module model.ismark_v6_30bit
+
+
+
+
+python local_watermark_crop_eval.py \
+  --cfg ./config/v6_30bit_true.yaml \
+  --ckpt ./output/ismark_v6_30bit_true/lightning_logs/version_5/checkpoints/last.ckpt \
+  --model-module model.ismark_v6_30bit \
+  --img-dir ./output/div2k_imgs \
+  --num-images 100 \
+  --num-crops 1 \
+  --image-size 2048 \
+  --crop-size 128 \
+  --patch-size 128 \
+  --decode-size 128 \
+  --device cuda:0
+
+
+
+
+python local_watermark_crop_eval.py   --cfg ./config/v6_30bit_true.yaml   --model-module model.ismark_v6_30bit --crop-size 128  --patch-size 128  --per-image-msg 

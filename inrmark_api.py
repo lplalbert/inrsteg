@@ -77,19 +77,25 @@ cfg_path = "./config/v6_30bit_true.yaml"
 # 在不同尺度上进行渲染
 # cfg_path = "./config/v6_30bit_true.yaml"
 
-# cfg_path ="./config/v6.yaml"
+# cfg_path ="./config/v6_30bits.yaml"
 # ckpt_path = "output/ismark_v6_30bits/lightning_logs/version_0/checkpoints/ckpt-epoch=109-val_loss=0.0481.ckpt"
 # 训练完成后可通过环境变量覆盖具体 checkpoint:
 # INRMARK_CKPT=./output/ismark_v6_30bit_true/lightning_logs/version_x/checkpoints/xxx.ckpt python inrmark_api.py
 ckpt_path = os.environ.get(
     "INRMARK_CKPT",
     "./output/ismark_v6_30bit_true/lightning_logs/version_5/checkpoints/last.ckpt"
+    # "output/ismark_v6_30bits/lightning_logs/version_0/checkpoints/ckpt-epoch=109-val_loss=0.0481.ckpt"
 )
 device = "cpu"
 args = Args().load(cfg_path)
+print("[inrmark_api] cfg_path =", cfg_path)
+print("[inrmark_api] ckpt_path =", ckpt_path)
+print("[inrmark_api] INRMARK_CKPT =", "set" if os.environ.get("INRMARK_CKPT") else "unset")
+print("[inrmark_api] model_module =", INRMark.__module__)
+print("[inrmark_api] msg_len =", args.msg_len)
 model = INRMark.load_from_checkpoint(ckpt_path, args=args).to(device).eval()
 
-data_path = "./output/div2k_imgs"
+data_path = "/mnt/xsj2023/Datasets/DIV2K/DIV2K_valid"
 imgs = os.listdir(data_path)
 fixed_psnr = None
 img_size = 2048
