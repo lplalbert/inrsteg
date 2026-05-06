@@ -1,0 +1,12 @@
+python local_watermark_crop_eval.py \
+  --cfg ./config/v6_30bits.yaml \
+  --ckpt ./output/ismark_v6_30bits/lightning_logs/version_0/checkpoints/ckpt-epoch=109-val_loss=0.0481.ckpt \
+  --model-module model.ismark_v6_30bit \
+  --img-dir ./output/div2k_imgs \
+  --num-images 50 \
+  --num-crops 20 \
+  --image-size 512 \
+  --crop-size 128 \
+  --patch-size 128 \
+  --overlap 0 \
+  --device cuda:0

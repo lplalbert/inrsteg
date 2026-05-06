@@ -22,7 +22,7 @@ from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
 from dataset.Mydataset import MyDataset, generate_grid_coordinates
 
-
+# 重新训练的 只会在80%左右
 class SEBlock(nn.Module):
     def __init__(self, channel, reduction=16):
         super(SEBlock, self).__init__()

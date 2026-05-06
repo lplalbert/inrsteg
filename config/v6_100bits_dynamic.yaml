@@ -1,22 +1,23 @@
-name: "ismark_v1_valid_128_alpha_0.02_min_scale_0.06_pnsr_36"
+name: "ismark_v6_100bits"
+# 这个版本是动态去增加bit数目的
 root_dir: "./output"
 gpus: [2, 3]
 batch_size: 32
 num_workers: 32
 max_epochs: 20000
 find_unused_parameters: false
-ckpt_path: "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v1_valid_128_alpha_0.02_min_scale_0.06_pnsr_36/lightning_logs/version_0/checkpoints/ckpt-epoch=79-val_loss=0.3051.ckpt"
+ckpt_path: "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v6_100bits/lightning_logs/version_4/checkpoints/ckpt-epoch=179-val_loss=0.7631.ckpt" #"/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v6/lightning_logs/version_8/checkpoints/ckpt-epoch=239-val_loss=0.0125.ckpt"
 lr: 0.001
 n_val_epoch: 5
 seed: 42
 
 img_size: 128
-msg_len: 30
+msg_len: 100
 feat_dim: 256
 hidden_dim: 128
 coord_map_dim: 32
 decoder_blocks: 2
-min_scale: 0.06 # 1
+min_scale: 0.0 # 1
 
 use_bg: true
 
@@ -28,11 +29,11 @@ use_global: false
 
 use_cell: false # 不能加，加了就会导致不同尺度下解码不同了
 tunable_decoder: true
-fixed_psnr: 36
+fixed_psnr: null
 inject_rgb: true
 noised: true
 use_jnd: true
-alpha: 0.02 # 0.02大概PSNR在35左右
+alpha: 0.1 # 0.02大概PSNR在35左右
 
 w_msg: 10
 w_img: 1

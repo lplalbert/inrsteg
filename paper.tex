@@ -1,0 +1,1267 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2025
+
+% The authors should use one of these tracks.
+% Before accepting by the NeurIPS conference, select one of the options below.
+% 0. "default" for submission
+ \usepackage{neurips_2025}
+% the "default" option is equal to the "main" option, which is used for the Main Track with double-blind reviewing.
+% 1. "main" option is used for the Main Track
+%  \usepackage[main]{neurips_2025}
+% 2. "position" option is used for the Position Paper Track
+%  \usepackage[position]{neurips_2025}
+% 3. "dandb" option is used for the Datasets & Benchmarks Track
+ % \usepackage[dandb]{neurips_2025}
+% 4. "creativeai" option is used for the Creative AI Track
+%  \usepackage[creativeai]{neurips_2025}
+% 5. "sglblindworkshop" option is used for the Workshop with single-blind reviewing
+ % \usepackage[sglblindworkshop]{neurips_2025}
+% 6. "dblblindworkshop" option is used for the Workshop with double-blind reviewing
+%  \usepackage[dblblindworkshop]{neurips_2025}
+
+% After being accepted, the authors should add "final" behind the track to compile a camera-ready version.
+% 1. Main Track
+ % \usepackage[main, final]{neurips_2025}
+% 2. Position Paper Track
+%  \usepackage[position, final]{neurips_2025}
+% 3. Datasets & Benchmarks Track
+ % \usepackage[dandb, final]{neurips_2025}
+% 4. Creative AI Track
+%  \usepackage[creativeai, final]{neurips_2025}
+% 5. Workshop with single-blind reviewing
+%  \usepackage[sglblindworkshop, final]{neurips_2025}
+% 6. Workshop with double-blind reviewing
+%  \usepackage[dblblindworkshop, final]{neurips_2025}
+% Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote.
+% For workshops (5., 6.), the authors should add the name of the workshop, "\workshoptitle" command is used to set the workshop title.
+% \workshoptitle{WORKSHOP TITLE}
+
+% "preprint" option is used for arXiv or other preprint submissions
+ % \usepackage[preprint]{neurips_2025}
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2025}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{multirow}
+\usepackage{bbding}
+\usepackage{fontawesome}
+\usepackage{wrapfig} 
+
+% Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote. 
+\title{Ultra-high Resolution Watermarking Framework Resistant to Extreme Cropping and Scaling}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{%
+  David S.~Hippocampus\thanks{Use footnote for providing further information
+    about author (webpage, alternative address)---\emph{not} for acknowledging
+    funding agencies.} \\
+  Department of Computer Science\\
+  Cranberry-Lemon University\\
+  Pittsburgh, PA 15213 \\
+  \texttt{hippo@cs.cranberry-lemon.edu} \\
+  % examples of more authors
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \AND
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\begin{abstract}
+%background
+Recent developments in DNN-based image watermarking techniques have achieved impressive results in protecting digital content. 
+%drawback
+However, most existing methods are constrained to low-resolution images as they need to encode the entire image, leading to prohibitive memory and computational costs when applied to high-resolution images. 
+Moreover, they lack robustness to distortions prevalent in large-image transmission, such as extreme scaling and random cropping.
+%method
+To address these issues, we propose a novel watermarking method based on implicit neural representations (INRs). 
+Leveraging the properties of INRs, our method employs resolution-independent coordinate sampling mechanism to generate watermarks pixel-wise, achieving ultra-high resolution watermark generation with fixed and limited memory and computational resources. This design ensures strong robustness in watermark extraction, even under extreme cropping and scaling distortions.
+Additionally, we introduce a hierarchical multi-scale coordinate embedding and a low-rank watermark injection strategy to ensure high-quality watermark generation and robust decoding.
+%result
+Experimental results demonstrate that our method significantly outperforms existing schemes in terms of both robustness and computational efficiency while preserving high image quality.
+Our approach achieves an accuracy greater than 98\% in watermark extraction with only 0. 4\% of the image area in 2K images. These results highlight the effectiveness of our method, making it a promising solution for large-scale and high-resolution image watermarking applications.
+
+\end{abstract}
+
+
+\section{Introduction} \label{introduction}
+
+
+
+% \begin{figure}[ht]
+% \centering
+% \includegraphics[width=0.5\linewidth]{resource/diff_frame.pdf}
+
+% \caption{Different high resolution watermark embedding schemes. Where the color blocks on the image represent the watermark embedding area and the red boxes represent the area where the image is cropped for decoding the watermark.}
+% \label{fig:diff_framework}
+% % \vspace{-10pt}
+% \end{figure}
+
+% 背景
+With the rapid progress of the digital age, images have become a fundamental medium of information exchange, reaching unprecedented scales in dissemination and application across various fields.
+Concurrently, image watermarking techniques have emerged as pivotal tools for copyright protection, data security, and integrity verification. However, with the increasing demand for processing large-scale and high-resolution images, DNN-based watermarking approaches face significant challenges in adapting to the requirements of large-scale image watermarking.
+
+
+
+% 问题
+Typical deep learning-based image watermarking methods are generally designed for low-resolution images, requiring full-image processing \cite{zhu2018hidden, tancik2020stegastamp, DBLP:conf/mm/FangJMCZ22}. 
+As a result, these methods face significant limitations when applied to ultra-high resolution (UHR) images.
+First, processing the entire UHR image incurs high computational costs, resulting in long processing times and potential memory overflow, which impacts efficiency and feasibility. Second, in the decoding phase, UHR images are more vulnerable to scaling and cropping distortions during transmission. Existing watermarking methods, optimized for low-resolution content, struggle to preserve watermark integrity under these severe transformations.
+% First, during the embedding stage, processing the entire UHR image imposes substantial computational demands. This leads to prolonged processing times and a high risk of memory overflow, which hinders both efficiency and practical feasibility. Second, in the decoding phase, UHR images, due to their sheer size, are more susceptible to aggressive scaling and cropping distortions common during transmission. Existing watermarking methods, optimized for low-resolution content, generally lack the robustness to withstand these severe transformations, often failing to preserve the watermark's integrity and ensure its retrievability under such conditions.
+
+
+% 现有方法
+% As shown in Figure \ref{fig:diff_framework} (a), to embed information in large-resolution images, existing methods commonly use a block-based approach \cite{guo2023practical}, where the image is divided into non-overlapping sub-images, and a watermark is embedded into each block. However, this method has two main drawbacks. First, the accuracy of watermark block localization significantly impacts decoding performance; any misalignment can reduce extraction effectiveness. Second, the watermark block is typically much smaller than the original image, leaving it highly vulnerable to scaling distortions.
+% Another approach involves embedding the watermark on low-resolution images and then interpolating the watermark residuals to a higher resolution for embedding \cite{bui2023trustmark}. While this method reduces the computational burden by operating on low-resolution images, the watermark becomes more susceptible to failure due to local cropping attacks, which weakens its robustness.
+
+
+\begin{wrapfigure}{r}{0.5\textwidth}  % 'l' 表示图片位于左侧，0.5\textwidth 是图片的宽度
+    \centering
+    \includegraphics[width=\linewidth]{resource/diff_frame.pdf}  % 图片占据半页宽度
+    \caption{Different high resolution watermark embedding schemes. Where the color blocks on the image represent the watermark embedding area and the red boxes represent the area where the image is cropped for decoding the watermark.}
+    \label{fig:diff_framework}
+% \vspace{-10pt}
+\end{wrapfigure}
+
+% \begin{figure}[ht]
+% \centering
+% \includegraphics[width=0.8\linewidth]{resource/diff_frame.pdf}
+
+% \caption{Different high resolution watermark embedding schemes. Where the color blocks on the image represent the watermark embedding area and the red boxes represent the area where the image is cropped for decoding the watermark.}
+% \label{fig:diff_framework}
+% % \vspace{-10pt}
+% \end{figure}
+
+As shown in Figure \ref{fig:diff_framework} (a), existing methods for embedding information in high-resolution images typically use a block-based approach \cite{guo2023practical}, where the image is divided into non-overlapping blocks, and the same watermark is embedded into each block. However, this approach has two main drawbacks. First, the accuracy of block localization is crucial for decoding performance; misalignment can significantly reduce extraction effectiveness. Second, because the watermark block is smaller than the original image, it is highly susceptible to scaling distortions. An alternative approach embeds the watermark on low-resolution images and then interpolates the residuals to higher resolutions for embedding \cite{bui2023trustmark}. While this reduces the computational burden, it also makes the watermark more vulnerable to local cropping attacks, compromising its robustness.
+
+
+
+
+% 提出方案
+%To address the challenges of watermarking large-scale images, we propose an innovative solution based on Implicit Neural Representations (INRs). INRs introduces a novel framework for watermark embedding, overcoming the limitations of traditional methods and enabling robust watermarking with precise decoding across images of arbitrary resolutions. Unlike conventional approaches, our method employs a continuous coordinate mapping mechanism that utilizes learnable embedding vectors and INR to map each pixel coordinate to its corresponding watermark RGB value. This approach eliminates dependence on fixed image resolutions, significantly enhancing the scalability and adaptability of watermarking techniques. Consequently, the proposed method demonstrates superior performance, effectively handling both standard-resolution and ultra-high-resolution images.
+To address the challenges of watermarking large-scale images, we propose an innovative solution based on Implicit Neural Representations (INRs). As illustrated in Figure \ref{fig:diff_framework} (b), our method maps continuous pixel coordinates directly to the corresponding RGB values of the watermark.
+This eliminates the constraint of fixed image resolutions, enabling watermark embedding in UHR images while ensuring robustness against extreme cropping and scaling distortions.
+The main contributions of this paper can be summarized as follows:
+\begin{itemize}
+    \item We propose an innovative INR-based framework for ultra-high resolution watermarking, offering a groundbreaking solution to the challenges of watermarking high-resolution images.
+    \item We introduce a hierarchical multi-Scale coordinates embedding mechanism for accurate watermark generation across scales. In addition, we introduce a low-rank injection scheme for efficient integration of watermarks.
+    \item Extensive experiments on widely representative datasets demonstrate the exceptional performance and significant advantages of our proposed method in handling high-resolution images and accommodating diverse resolution scenarios. In addition, our method exhibits excellent resistance to extreme cropping and scaling that often occurs in high-resolution images.
+\end{itemize}
+
+
+
+%-------------------------------------------------------------------------
+\section{Related Work}
+
+\textbf{DNN-based Image Watermarking.} Recent advances in deep learning have significantly impacted digital image watermarking. HiDDeN \cite{zhu2018hidden} introduced an end-to-end DNN-based watermarking framework, resembling an autoencoder, setting the stage for future models. StegaStamp \cite{tancik2020stegastamp} improves print-shooting robustness by simulating the printing and photographing process. RIHOOP \cite{jia2020rihoop} further refines this by introducing a differentiable distortion model that preserves the integrity of the watermark under camera imaging conditions. Subsequent works \cite{jia2021mbrs, fang2023flow, li2024screen, sun2024end} focus on increasing robustness against various distortions. However, all of these methods are limited to fixed low-resolution images (typically less than $512$). When the image resolution increases, these methods face significant challenges, such as increased computational complexity and memory consumption, which hinder their practical application with high-resolution images.
+
+\textbf{High-Resolution Image Watermarking.} Several approaches have been proposed to address the challenges of watermark embedding in high-resolution images. DWSF \cite{guo2023practical} uses a block-based strategy, selecting fixed-size watermark blocks for embedding, but it struggles with block localization and scaling resistance. TrustMark \cite{bui2023trustmark}, on the other hand, generates watermark residues on low-resolution images and then uses linear interpolation to scale them to high-resolution images. However, this approach is vulnerable to local cropping attacks. Wang et al. \cite{wang2024achieving} use Implicit Neural Representations to fit the host image and then fine-tune the INR to embed watermark information at various resolutions. However, this method requires training separate networks for each image and watermark, making the process time-consuming. Additionally, they need the full image to decode the watermark. Although the above methods attempt to embed watermarks in large-sized images, none of them effectively balance high-rato cropping, scaling resilience, and real-time performance—three critical challenges commonly encountered in large image watermarking scenarios.
+
+\textbf{Implicit Neural Representations.} 
+% Implicit Neural Representations (INRs) use deep neural networks to model continuous mappings between inputs and outputs, rather than relying on predefined rules. INRs have found widespread applications in various fields, including 3D reconstruction \cite{mildenhall2021nerf, gafni2021dynamic, hui2024microdiffusion}, super-resolution \cite{chen2021learning, yang2021implicit, chen2022videoinr}, and image generation \cite{skorokhodov2021adversarial, shaham2021spatially, anokhin2021image}. 
+% In the image domain, a classic INRs takes spatial coordinates as input and outputs RGB values, enabling the representation of an image as a continuous signal parameterized by coordinates. A major challenge for CNN-based watermarking methods in large images is the need to process the entire image to maintain watermark continuity and consistency, which increases memory and computation costs. In contrast, INR efficiently models continuous signals, offering a more scalable solution. In this context, we propose using INRs to parameterize the watermark signal by coordinates. By sampling different spatial locations, we can generate continuous watermark signals at arbitrary positions and resolutions, overcoming the limitations of CNN-based methods and enabling efficient, scalable embedding.
+
+Implicit Neural Representations (INRs) use deep neural networks to model continuous mappings between inputs and outputs, rather than relying on predefined rules. INRs have been widely applied in 3D reconstruction \cite{mildenhall2021nerf, gafni2021dynamic, hui2024microdiffusion}, super-resolution \cite{chen2021learning, yang2021implicit, chen2022videoinr}, and image generation \cite{skorokhodov2021adversarial, shaham2021spatially, anokhin2021image}. In the image domain, an INR takes spatial coordinates as input and outputs RGB values, representing the image as a continuous signal. CNN-based watermarking methods struggle with large images due to high memory and computation costs. In contrast, INRs model continuous signals efficiently, offering a scalable solution. We propose using INRs to parameterize the watermark signal by coordinates, enabling continuous watermark generation at arbitrary positions and resolutions, overcoming the limitations of CNN-based methods for efficient embedding.
+
+
+\section{Methodology}
+
+% Our approach is based on Implicit Neural Representations (INRs), which typically learn a mapping function $ g_{\phi}(\boldsymbol{x}): \mathbb{R}^{d} \to \mathbb{R}^{c} $, where \( d \) represents the dimension of the coordinates \( \boldsymbol{x} \), and \( c \) represents the dimensionality of the output. 
+% The function \( g_{\phi}(\cdot) \) is generally represented by a MLP, with \( \phi \) denoting the learnable parameters. In the image domain, where \( d = 2 \) and \( c = 3 \), this mapping corresponds to transforming the 2D coordinates \( \{x, y\} \) into the RGB values at those positions. 
+% The core idea of our method is to parametrize a template watermark using coordinates, with INRs serving as the rendering function for the watermark signal. 
+% Due to the continuity of the coordinates, we can sample watermark signals at arbitrary positions and resolutions on a fixed-size grid.
+
+Our approach is based on Implicit Neural Representations (INRs), the key idea of our method is to parametrize a template watermark using coordinates, with INRs serving as the rendering function for the watermark signal. A comprehensive architecture is presented in Figure \ref{fig:struct}, illustrating the key components of our framework.
+The approach is built upon three core modules: (a) a resolution-independent sampling strategy combined with hierarchical multi-scale coordinate embedding, ensuring consistency and robustness of watermark across varying image resolutions with a fixed and limited computational cost; (b) low-rank watermark injection based on Implicit Neural Representations, which reduces computational cost while achieving robust watermark embedding and (d) noise enhancement and decoding of the watermarked image.
+
+\begin{figure*}[ht]
+\centering
+\includegraphics[width=0.9\textwidth]{resource/struct.pdf}
+
+\caption{Architecture of the proposed model. (a) shows the process of embedding coordinates and messages, and (b) shows the process of rendering into watermarks via INR using embedding vectors. (c) shows the process of low-rank watermark injection. (d) shows the decoding process of our method.}
+\label{fig:struct}
+\vspace{-10pt}
+\end{figure*}
+
+
+\subsection{Sampling and Embedding}
+% \textbf{Resolution-Independent Coordinates Sampling.} For an image of arbitrary size $(H, W)$, we normalize the coordinates $(x, y)$ of any pixel on the image to the range $[-1, 1]$ as follows:
+% \begin{equation}
+%     (x,y) \rightarrow (\frac{2x}{H}-1, \frac{2y}{W}-1)
+% \end{equation}
+
+% As illustrated in Figure \ref{fig:struct} (a), we denote the normalized coordinate matrix obtained from this process as \( \psi \). To sample submatrix of arbitrary size from \( \psi \), we use a fixed \( r \times r \) grid \( \mathcal{C} \) to sample coordinates at regular intervals. Where $r$ defaults to $128$. Given the coordinates of the sampled upper-left corner $(x_0,y_0)$, $\mathcal{C}$ can be expressed as:
+% \begin{equation}
+%    \mathcal{C} = \{ (x_i, y_j) \mid x_i = x_0 + i \cdot \Delta_t, y_j = y_0 + j \cdot \Delta_t \} 
+% \end{equation}
+
+% where $i,j \in [0, r-1]$ and $\Delta_t$ is a randomly selected interval.
+% The choice of \( \Delta_t \) determines the resolution of \( \mathcal{C} \), as different values lead to grids of varying densities. This approach takes advantage of the continuous nature of the coordinate space, enabling flexible extraction of local regions at different scales while maintaining a fixed grid.
+%$\mathcal{C}$ sampled by different sizes of $\Delta_t$ has different resolutions. This method leverages the continuous nature of the coordinates, allowing us to represent local regions at any scale by the fixed grid \( \mathcal{C} \).
+
+
+
+\textbf{Resolution-Independent Coordinates Sampling.}
+For an image of size $(H, W)$, we normalize the pixel coordinates $(x, y)$ to the range $[-1, 1]$ as follows:
+\begin{equation}
+(x, y) \rightarrow \left( \frac{2x}{H} - 1, \frac{2y}{W} - 1 \right)
+\end{equation}
+The normalized coordinate matrix obtained is denoted as $\psi$ in Figure  \ref{fig:struct} (a). To sample submatrices of arbitrary size from $\psi$, we use a fixed $r \times r$ coordinate grid $\mathcal{C}$, where $r$ is typically set to 128. The coordinates of the sampled submatrix are determined by the upper-left corner $(x_0, y_0)$, and $\mathcal{C}$ is defined as:
+\begin{equation}
+   \mathcal{C} = \{ (x_i, y_j) \mid x_i = x_0 + i \cdot \Delta_t, y_j = y_0 + j \cdot \Delta_t \} 
+\end{equation}
+where $i,j \in [0, r-1]$ and $\Delta_t$ is a randomly selected interval. The value of $\Delta_t$ controls the resolution of $\mathcal{C}$, allowing flexible extraction of regions at different scales while maintaining a fixed grid.
+
+
+
+\textbf{Hierarchical Multi-Scale Coordinates Embedding.} Many prior works \cite{muller2022instant, girish2023shacira} have shown that using only coordinates as input leads to longer training times, loss of high-frequency details, and poor scalability for high-resolution signals. This is a challenge, as we aim to decode the watermark at arbitrary resolutions while maintaining robustness to cropping and scaling. Therefore, modeling multi-scale features of the watermark is crucial.
+
+To address this issue, we propose the use of a set of feature grids with varying resolutions $L=\{L_i\}^n$ to represent the embedded features of the watermark template, where $n$ (default 4) denotes the number of feature grids.
+Each grid $L_i\in\mathbb{R}^{d\times 2^{i+4} \times 2^{i+4}}$ is a learnable parameterized matrix, with $d$ (default $32$) representing the dimension of the features. The coordinates of the feature vectors in each grid are normalized to the range $[-1, 1]$. 
+Given an input coordinate \( (x, y) \), we identify the four nearest corner features in the matrix \( L_i \), with the bottom-left and top-right corner features having coordinates \( (x_{bl}^i, y_{bl}^i) \) and \( (x_{tr}^i, y_{tr}^i) \), respectively. By applying bilinear interpolation, we can obtain the feature representation corresponding to any input coordinate in matrix \( L_i(x,y) \):
+\begin{equation}
+    \resizebox{0.9\hsize}{!}{
+    $L_{i}(x,y)=\begin{bmatrix}
+  x_{tr}^i-x& x-x_{bl}^i
+\end{bmatrix}\begin{bmatrix}
+  L_i(x_{bl}^i,y_{bl}^i)& L_i(x_{bl}^i,y_{tr}^i) \\
+  L_i(x_{tr}^i,y_{bl}^i)& L_i(x_{tr}^i,y_{tr}^i)
+\end{bmatrix}\begin{bmatrix}
+ y_{tr}^i-y\\
+y-y_{bl}^i
+\end{bmatrix}k$
+}
+\end{equation}
+
+where $k=\frac{1}{(x_{tr}^i-x_{bl}^i)(y_{tr}^i-y_{bl}^i)}$. Additionally, to further enhance the ability of INR to represent high-frequency details, we apply Fourier feature mapping $\mathcal{F}$ to process the raw coordinates \cite{tancik2020fourier}, obtaining the coordinate encoding $z_p$. Therefore, for any given coordinate $(x, y)$, we can obtain its corresponding feature representation $z_e\in \mathbb{R}^{d_e}$:
+\begin{equation}
+    z_e=\Gamma(L_1(x,y)\odot L_{2}(x,y)\cdots L_n(x,y)\odot z_p) 
+\end{equation}
+where "$\odot$" denotes concatenation along the feature dimension and $\Gamma(*)$ is a linear layer used to project the features into the $d_e$-dimensional space (default 256).
+
+
+\textbf{Message Embedding.} We use a four-layer MLP with fully connected layer, BatchNorm, and ReLU activation function as the Message Encoder $\mathcal{M}$. For a \( t \)-length binary message \( m = \{0, 1\}^t \), we obtain the corresponding message feature \( z_m = \mathcal{M}(m) \in \mathbb{R}^{d_m}  \). $d_m$ defaults to 128. 
+
+\subsection{Low-rank Watermark Injection based on Implicit Neural Representations} \label{low_rank}
+
+\textbf{INR Rendering.} As shown in Figure \ref{fig:struct} (b), given a positional feature embedding \( z_e \) and a watermark feature \( z_m \),  we use an INR to generate the watermark signal for the corresponding pixel location. This process is repeated for all pixel positions, and the results are reshaped to form the final watermark signal $W$. Then we randomly sample an \( r \times r \) image block \( I \) and obtain the watermarked image as \( I' = I + \gamma W \), where \( \gamma \) (default 0.02) controls embedding strength. A smaller \( \gamma \) helps distribute the watermark evenly, enhancing visual quality and robustness. See supplementary materials for details.
+
+
+\textbf{Low-rank Watermark Injection.} A simple INR-based approach is to concatenate two features and process them through an MLP to predict RGB values. However, prior research \cite{zadeh2017tensor, liu2018efficient} has demonstrated that such direct concatenation leads to inadequate feature interaction between modalities. Following TFN \cite{zadeh2017tensor}, we compute the Cartesian product of \( z_e \) and \( z_m \) to facilitate richer cross-modal feature interactions. This can be formulated as:
+\begin{equation}
+    z =M \cdot \mathrm{Vec}(\alpha \beta^\top)+bias
+\end{equation}
+Where \( \alpha = [z_e, 1] \in \mathbb{R}^n \), \( \beta = [z_m, 1] \in \mathbb{R}^m \) and \( \mathrm{Vec}(*) \) the vectorization operator. The matrix \( M \in \mathbb{R}^{h \times (n \times m)} \) is a learnable parameter, and \( z \) is the final output feature. $h$ is the dimension of the output feature, default is $256$.
+
+However watermark injection occurs independently at each pixel location in our method. This results in significant computational and memory overhead. To mitigate this, we reformulate it (ignoring bias) as:
+\begin{equation}
+     \begin{aligned}
+         z=M\cdot \mathrm{Vec}(I\alpha\beta^\top)
+     =M(\beta\otimes I)\mathrm{Vec}(\alpha)=M(\beta\otimes I)\alpha 
+     \end{aligned}  
+\end{equation}
+
+We expand \( M \) and \( \beta \otimes I \) into a block matrix form as follows:
+\begin{equation}
+\begin{aligned}
+    z&=\begin{bmatrix}
+  M_1&  M_2&  \cdots & M_m
+\end{bmatrix} \begin{bmatrix}
+  \beta_1 I \\
+  \beta_2 I\\
+\vdots \\
+  \beta_m I
+\end{bmatrix}\alpha =\sum_{i=1}^m\beta_iM_i\alpha
+\end{aligned}
+\end{equation}
+
+Where \( M_i \in \mathbb{R}^{h \times n} \) can be viewed as a slice of a third-order tensor \( P \in \mathbb{R}^{m \times h \times n} \), and \( \sum_{i=1}^m\beta_iM_i \) can be interpreted as a weighted sum of the slices of \( P \). Thus, our goal is to reduce the parameter count of the learnable tensor \( P \).
+
+Using Canonical Polyadic Decomposition (CPD) for low-rank approximation, we introduce three small learnable matrices \( u \in \mathbb{R}^{m \times d} \), \( v \in \mathbb{R}^{h \times d} \), and \( w \in \mathbb{R}^{n \times d} \), where \( d \) is the rank (defaults 32). Thus, any element in \( P \) can be expressed as $p_{ijk}=\sum_{r=1}^{d}u_{ir}v_{jr}w_{kr}$.
+% \begin{equation}
+%     p_{ijk}=\sum_{r=1}^{d}u_{ir}v_{jr}w_{kr}
+% \end{equation}
+Then for any element of the output feature $z$ it can be expressed as:
+\begin{equation}
+    \begin{aligned}
+        z_j=\sum_{k=1}^{n}\sum_{i=1}^{m}\beta_ip_{ijk}\alpha_k = \sum_{k=1}^{n}\sum_{i=1}^{m}\beta_i\sum_{r=1}^{d}u_{ir}v_{jr}w_{kr}\alpha_k  =  \sum_{k=1}^{n}\sum_{i=1}^{m}\sum_{r=1}^{d}\beta_iu_{ir}v_{jr}w_{kr}\alpha_k
+    \end{aligned}
+\end{equation}
+
+After simplification, we obtain: $z=v*((w^\top*\alpha)\circ(u^\top*\beta))$. Where "$*$" denotes matrix multiplication and "$\circ$" denotes element-wise multiplication. To preserve the rich semantic information contained in the features \( \alpha \), we employ skip-connection to mitigate potential information loss caused by low-rank decomposition. Additionally, we stack $4$ identical modules to ensure the robust injection of the watermark information. Figure \ref{fig:struct} (c) illustrates our INR Block. It can be expressed as:
+\begin{equation}
+    \alpha_{i}=\mathrm{Relu}(\Psi(v_{i-1}*((w^\top_{i-1}*\alpha_{i-1})\circ(u^\top_{i-1}*\beta))))+\alpha_{i-1}
+\end{equation}
+
+Where \( \Psi(*) \) denotes 1D batch normalization. A final FC layer maps features to RGB values, and after reshaping, the watermark $W \in \mathbb{R}^{3\times r \times r}$ is obtained.
+
+\subsection{Noise Layer and Message Decoder}
+Figure \ref{fig:struct} (d) illustrates the decoding process of our model. To enhance generalization, we introduce a composite noise layer to simulate real-world distortions. The Message Decoder then extracts the watermark from the distorted image.
+
+\textbf{Noise Layer.} The noise layer consists of Rotation, Cropping, Translation, Scaling, Shearing, Dropout, Cropout, Color changes, JPEG compression, Gaussian filtering, and Gaussian noise. During training, a random noise type is applied to the watermarked image \( I' \), producing \( \hat{I} \). Details are in the supplementary materials.
+
+\textbf{Message Decoder.} Our Message Decoder incorporates the SE Block \cite{hu2018squeeze} inspired by MBRS \cite{jia2021mbrs}. It processes the input through four stacked blocks of identical structure. Each block consists of a ConvBNReLU layer with a kernel size of 3, followed by an SE Block and another convolutional layer. Finally, downsampling is performed using a convolutional layer with a kernel size of 4 and a stride of 2. The extracted features are pooled along the channel dimension, and a fully connected layer predicts the watermark information \( \hat{m} \).
+
+\subsection{Loss Function}
+Our loss function comprises two components: the first aims to preserve the visual quality of the watermarked image $I^{'}$, while the second seeks to minimize the discrepancy between the extracted watermark \(\hat{m}\) and the embedded watermark \(m\). Both components are formulated using the mean squared error (MSE) loss. The total loss is given by:
+\begin{equation}
+    \mathcal{L} = \lambda_1 \left\| I - \hat{I} \right\|_2 + \lambda_2 \left\| m - \hat{m} \right\|_2
+\end{equation}
+
+where \( \lambda_1 \) and \( \lambda_2 \) are hyperparameters that balance the trade-off between visual quality preservation and watermark extraction accuracy. By default, both are set to $1$.
+
+
+
+
+\section{Experiments} \label{experiments}
+
+In this section, we conduct extensive experiments to evaluate the effectiveness of our proposed INR-based watermarking method. 
+First, we describe the experimental setup. Then, we compare our method with previous SOTA models under low resolution. Subsequently, we evaluate our method across various resolutions against other large-image watermarking approaches, demonstrating its superior performance. Finally, ablation studies assess the contribution of proposed components.
+\subsection{Experimental Setting} \label{setting}
+\textbf{Implementation Details.} Our model is trained on the high-resolution DIV2K \cite{agustsson2017ntire} image dataset. For each training iteration, we randomly select an image from the dataset and apply a random scaling operation, where the scaling factor is chosen from the range $[0.06, 1]$. Following the scaling, we randomly crop a $128 \times 128$ image patch from the scaled image, which serves as the input $I$ to the model. For the watermark information $m$, we randomly generate a binary bit stream of length $30$ in each iteration. For the sampling coordinates $\mathcal{C}$, we perform random sampling from a normalized coordinate grid $\psi$, using a fixed $128 \times 128$ grid size.
+We randomly generate training samples, with a training set size of $50,000$ samples. The model is trained using the AdamW \cite{loshchilov2017decoupled} optimizer with a learning rate of \(4 \times 10^{-4}\). The batch size is set to $32$, and the training is conducted for 2000 epochs across two NVIDIA RTX 3090 GPUs.
+
+\textbf{Metrics.} We evaluate our method using three metrics: Peak Signal-to-Noise Ratio(PSNR) for visual quality, Structural Similarity Index(SSIM) for structural similarity and Average Bit Accuracy (ACC) for average  decoding accuracy. PSNR and SSIM assess image quality, while ACC measures watermark extraction robustness.
+
+\textbf{Baseline.} We use HiDDeN \cite{zhu2018hidden}, StegaStamp \cite{tancik2020stegastamp}, MBRS \cite{jia2021mbrs}, DWSF \cite{guo2023practical}, TrustMark \cite{bui2023trustmark} and RAIM$_{\mathrm{ARK}}$ \cite{wang2024achieving} as baselines. The first three methods are limited to low-resolution images, while others can work at different resolutions. To ensure a fair comparison, we re-train these models (excluding TrustMark, which does not provide a training script) with our proposed noise layer, as the strength of the noise layer significantly impacts their performance. Initially, we train our model on $128 \times 128$ images and compare them with the low-resolution baselines to demonstrate the effectiveness of our method. Subsequently, we relax the resolution constraint, allowing models to be trained on images with different sizes, and compare them with corresponding large-image watermarking models to validate the superiority of our approach. Please refer to the supplementary material for more details.
+
+\begin{figure*}[ht]
+\centering
+\includegraphics[width=0.9\textwidth]{resource/vs.pdf}
+
+\caption{Visualization results at different resolutions. For each group, the first row presents cover images at different resolutions, starting from 2K size and progressively reduced by 75\%. The second row displays the corresponding watermarked images, while the third row shows the embedded watermarks.}
+\label{fig:vs}
+\vspace{-10pt}
+\end{figure*}
+
+\subsection{Visual Quality} \label{visual}
+Table \ref{table:vq} presents the visual quality across different methods. Our method does not achieve the highest PSNR and SSIM values, but it consistently maintains a PSNR above $35$. This result is expected, as our approach employs a template-based watermark, which does not leverage the content of the cover image for embedding. As a result, while the visual quality is slightly lower compared to methods that embed watermarks based on the cover image content, our method still achieves a PSNR above $35$, ensuring it meets practical requirements for everyday use.
+
+In addition, as shown in Figure \ref{fig:vs}, we also present the visualization results of our method at different resolutions. 
+We observe that watermarks generated from different embedded messages exhibit highly similar overall structural patterns, with variations primarily reflected in color and fine details. Moreover, the watermark consistently maintains a similar striped pattern and distribution across various resolutions, indicating its structural consistency across different scales. This ensures that the watermark information can be successfully decoded from cropped patches at different resolutions. 
+
+
+\subsection{Comparison with Previous Methods}
+We compare our method with previous SOTA models at a fixed resolution of $128\times 128$ to evaluate its effectiveness. For a comprehensive evaluation, we test the decoding accuracy of our trained model using a variety of distortions: Identity, Gaussian Noise($std=0.01$), Gaussian Filter ($\sigma=2$), JPEG Compression ($Q=50$), Dropout ($p=0.5$), Rotation ($deg=10$), Translation ($dis=0.1$) and Color Transform($f=0.1$).  To ensure a fair comparison, we fix the PSNR at 35 for all watermarked images following the approach in the MBRS \cite{jia2021mbrs} method. 
+
+Table \ref{table:rb} presents the experimental results.
+Despite our method relying on INR instead of CNN for message injection, our approach achieves high decoding accuracy across most distortions. This demonstrates that INR-based embedding remains robust and effective, preserving watermark integrity under various distortions.
+%Although our message injection is based on INR rather than CNN, our approach demonstrates strong decoding accuracy across most distortions. This indicates that, despite the absence of CNN-based feature extraction, the INR-based embedding remains robust and effective, successfully preserving watermark integrity even in the presence of various distortions.
+
+\begin{table}[]
+    \centering
+    
+\renewcommand\arraystretch{1.2}
+\resizebox{0.8\linewidth}{!}{
+
+\begin{tabular}{cccccccc}
+\toprule
+\multirow{2}{*}{} & \multicolumn{4}{c}{High Resolution}    & \multicolumn{3}{c}{Low Resolution} \\ \cmidrule{2-8} 
+                  & Proposed & DWSF   & TrustMark & RAIM   & HiDDeN   & StegaStamp   & MBRS     \\ \midrule
+PSNR              & 37.27    & 33.18  & 40.76     & 40.52  & 32.67    & 35.25        & 40.73    \\
+SSIM              & 0.9611   & 0.9269 & 0.9900    & 0.9898 & 0.8591   & 0.8864       & 0.9866  \\ \bottomrule
+
+\end{tabular}
+
+% \begin{tabular}{cccccc}
+% \toprule
+%                                       &      & Proposed & DWSF       & TrustMark & RAIM$_{\mathrm{ARK}}$ \\ \midrule
+% \multirow{2}{*}{Hight Resolution}     & PSNR & 37.27         & 33.18      & 40.76     &   40.52                      \\
+%                                       & SSIM & 0.9611        & 0.9269     & 0.9900    &   0.9898                      \\ \midrule
+%                                       &      & HiDDeN   & StegaStamp & MBRS      &   -                    \\ \midrule
+% \multirow{2}{*}{Low Resolution} & SSIM & 32.67    & 35.25      & 40.73     &          -             \\
+%                                       & PSNR & 0.8591   & 0.8864     & 0.9866    &         -            \\ \bottomrule
+% \end{tabular}
+}
+\caption{Average visual quality of the different methods.}
+\label{table:vq}
+\vspace{-10pt}
+\end{table}
+
+
+
+
+
+\begin{table*}[]
+    \centering
+    
+\renewcommand\arraystretch{1.2}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{ccccccccc}
+\toprule
+Method                & Identity & \begin{tabular}[c]{@{}c@{}}Gaussian Noise\\ ($std=0.01$)\end{tabular} & \begin{tabular}[c]{@{}c@{}}Gaussian Filter\\ ($\sigma=2$)\end{tabular} & \begin{tabular}[c]{@{}c@{}}JPEG Compression\\ ($Q=50$)\end{tabular} & \begin{tabular}[c]{@{}c@{}}Dropout\\ (0.5)\end{tabular} & \begin{tabular}[c]{@{}c@{}}Rotation\\ ($deg=10$)\end{tabular} & \begin{tabular}[c]{@{}c@{}}Translation\\ ($dis=0.1$)\end{tabular} & \begin{tabular}[c]{@{}c@{}}Color\\ ($f=0.1$)\end{tabular} \\ \midrule
+HiDDeN                & 88.34    & 87.96                                                                 & 60.14                                                                  & 52.96                                                   & 74.74                                                & 82.94                                                       & 82.85                                                           &  90.79                                                         \\
+StegaStamp            & 92.16    & 91.72                                                                 & 90.78                                                                  & 84.42                                                   & 77.53                                                & 87.19                                                       & 88.46                                                           &  91.21                                                         \\
+MBRS                  & 99.18    & 98.06                                                                 & 94.93                                                                  & \textbf{96.56}                                                   & \textbf{95.75}                                                & 95.37                                                       & 96.27                                                           &  98.37                                                         \\
+DWSF                  & 90.17    & 89.76                                                                 & 89.40                                                                  & 87.33                                                   & 76.47                                                & 86.56                                                       & 65.90                                                           & 78.36                                                     \\
+TrustMark             & 87.65    & 83.72                                                                 & 82.60                                                                  & 75.22                                                   & 76.58                                                & 49.50                                                       & 62.13                                                           & 87.25                                                     \\
+RAIM$_{\mathrm{ARK}}$ & 78.67    & 78.67                                                                 & 78.67                                                                  & 54.33                                                   & 57.67                                                & 77.24                                                          & 74.58                                                           & 77.67                                                     \\
+Proposed              & \textbf{100}      & \textbf{99.83}                                                                 & \textbf{98.86}                                                                  & 93.36                                                   & 95.13                                                & \textbf{99.73}                                                       & \textbf{99.59}                                                           & \textbf{99.93}                                                     \\ \bottomrule
+\end{tabular}
+}
+\caption{Benchmark comparisons on robustness against different distortions. Where the mean value of Gaussian Noise is 0, the kernel size of Gaussian Filter is 3, and JPEG Compression is simulated using Kornia \cite{eriba2019kornia}.}
+\label{table:rb}
+\end{table*}
+
+\subsection{Evaluation across Varying Image Resolutions}
+In this section, we investigate the performance of our method across different resolutions. We compare it with several SOTA watermarking methods capable of operating at various resolutions. 
+
+For high-resolution images, two key challenges are commonly encountered during transmission: (1) high-ratio scaling and (2) high-ratio random cropping. Table \ref{table:diff_size} presents the experimental results. To evaluate the generalizability of our model, we test it not only on DIV2K but also on 200 separately sampled images from each of the COCO \cite{lin2014microsoft} and FFHQ \cite{karras2019style} datasets.
+We embed watermarks at different resolutions and evaluate the performance of various methods under extreme cropping and scaling. Specifically, for cropping, we randomly extract \(128 \times 128\) patches for decoding, while for scaling, we uniformly resize the images to \(128 \times 128\) before decoding. To ensure a fair comparison, the PSNR is fixed at 35 for all watermarked images. 
+
+%where watermarks are embedded at a resolution of $2048\times 2048$ for all methods. The images are then scaled to different resolutions and subsequently cropped into $128 \times 128$ patches. To ensure a fair comparison, the PSNR is fixed at 35 for all watermarked images. 
+
+As can be seen, our method is far superior to the others. DWSF, RAIM$_{\mathrm{ARK}}$  and TrustMark are all struggling to resist cropping attacks in large-image watermarking. However, on 2K images, our method requires only \textbf{0.4\%} of the image area to maintain a \textbf{98\%} decoding accuracy. This superiority primarily stems from our coordinate sampling strategy and INR’s capability to model continuous signals.
+
+\begin{table*}[]
+\renewcommand\arraystretch{1.2}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{cccccccccccccc}
+\toprule
+\multirow{2}{*}{Distortions} & \multirow{2}{*}{Model} & \multicolumn{3}{c}{$128\times128$}               & \multicolumn{3}{c}{$512\times512$}               & \multicolumn{3}{c}{$2048\times2048$}             & \multicolumn{3}{c}{$4096\times4096$}             \\ \cmidrule{3-14} 
+                             &                        & DIV2K          & COCO           & FFHQ           & DIV2K          & COCO           & FFHQ           & DIV2K          & COCO           & FFHQ           & DIV2K          & COCO           & FFHQ           \\ \midrule
+\multirow{4}{*}{Cropping}    & DWSF                   & 90.17          & 89.83          & 78.93          & 53.28          & 54.10          & 52.73          & 50.80          & 50.73          & 50.64          & 50.03          & 50.33          & 50.12          \\
+                             & TrustMark              & 87.65          & 92.15          & 96.10          & 49.55          & 49.45          & 50.23          & 49.77          & 49.58          & 49.41          & 49.50          & 54.57          & 47.25          \\
+                             & RAIM$_{\mathrm{ARK}}$  & 78.67          & 77.33          & 78.30          & 53.33          & 48.67          & 45.33          & 54.00          & 48.67          & 46.67          & 54.35          & 49.46          & 46.85          \\
+                             & Proposed               & \textbf{99.99} & \textbf{99.85} & \textbf{99.91} & \textbf{99.86} & \textbf{99.84} & \textbf{99.95} & \textbf{98.74} & \textbf{94.80} & \textbf{93.83} & \textbf{85.94} & \textbf{86.93} & \textbf{83.23} \\
+\multirow{4}{*}{Scaling}     & DWSF                   & 90.17          & 89.83          & 78.93          & 89.56          & 89.40          & 77.90          & 80.70          & 80.83          & 67.07          & 63.73          & 63.43          & 56.57          \\
+                             & TrustMark              & 87.65          & 92.15          & 96.10          & 79.15          & 85.90          & 89.43          & 76.07          & 86.25          & 88.88          & 79.51          & 82.26          & 86.77          \\
+                             & RAIM$_{\mathrm{ARK}}$  & 78.67          & 77.33          & 78.30          & 61.67          & 63.76          & 66.52          & 62.33          & 64.37          & 63.16          & 62.67          & 64.48          & 62.89          \\
+                             & Proposed               & \textbf{99.99} & \textbf{99.85} & \textbf{99.91} & \textbf{99.86} & \textbf{99.88} & \textbf{99.96} & \textbf{98.66} & \textbf{99.16} & \textbf{99.33} & \textbf{99.33} & \textbf{92.83} & \textbf{98.66} \\ \bottomrule
+\end{tabular}
+}
+\caption{Average decoding accuracy of different models for extreme cropping and scaling at different resolutions.}
+\label{table:diff_size}
+\vspace{-10pt}
+\end{table*}
+
+In addition, we test the performance of different distortions at different resolutions. As shown in Figure \ref{fig:diff_distortion}, our model achieves a performance of more than 90\% at most resolutions, which is much better than other models.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.9\linewidth]{resource/hst.pdf}
+
+\caption{Average decoding accuracy of different models at different resolutions and distortions. Where GN stands for Gaussian Noise and GF stands for Gaussian Filter. To ensure fairness, the PSNR of all embedded images is standardized at $35$.}
+\label{fig:diff_distortion}
+\vspace{-10pt}
+\end{figure}
+
+% \textbf{Visualization.} As shown in Figure \ref{fig:vs}, the visualization results of the embedded images and watermarks at different resolutions are presented. It can be observed that the watermark consistently maintains a similar structure (watermark signal) across various resolutions, ensuring that the watermark information can be successfully decoded from cropped patches at different resolutions.
+
+
+
+\subsection{Embedding Rate Comparison}
+
+\begin{table}[]
+    \centering
+    
+\renewcommand\arraystretch{1.2}
+\resizebox{0.6\linewidth}{!}{
+\begin{tabular}{ccccc}
+\toprule
+Model          & Proposed                  & DWSF                        & TrustMark                   & RAIM$_{\mathrm{ARK}}$       \\ \midrule
+CPU            & \faCheck & \faTimes & \faTimes & \faTimes \\
+Embedding Rate & \textbf{4ms}                       & 74ms                            & 308ms                            & $>$ 20min                   \\ \bottomrule
+\end{tabular}
+}
+\caption{Embedding rates for different methods.Where the second row represents whether the embedding is done using only the CPU or not, and the third row represents the average watermark embedding rate for a single image with a resolution of 2K. We use AMD Ryzen 7 7840HS for our CPU and NVIDIA RTX 3090 for our GPU for testing.}
+\label{table:rate}
+\end{table}
+
+In this subsection, we compare the computational efficiency between the different methods by the embedding rate of the watermark.
+Since our focus is on watermark embedding for large images, which often incur high computational costs due to their large resolution, the real-time performance of watermarking systems can be significantly impacted. As shown in Figure \ref{table:rate}, our method is significantly faster. This result primarily becauses it is based on template watermarking, allowing all watermarks to be pre-generated once the model is trained. In contrast, other methods require the network to process the carrier image during embedding, resulting in slower performance.
+Worth mentioning is that RAIM$_{\mathrm{ARK}}$ requires INR encoding and watermark embedding fine-tuning for each image, making its embedding rate extremely slow.
+
+\subsection{Ablation Study}
+In this subsection, we examine the effectiveness of each component of our proposed method, focusing on two main points: (1) the impact of the hierarchical multi-Scale coordinates embedding layers on model performance, and (2) the effectiveness of low-rank watermark injection.
+
+Table \ref{table:ab} presents the results of our ablation study. We embed watermarks into 2K-resolution images and evaluate the average decoding accuracy after applying random noise attacks. The results show that removing multi-scale coordinate embedding significantly degrades performance, while increasing the number of embedding layers progressively improves it. For Low-rank Injection, replacing our design with feature concatenation followed by MLP prediction results in inferior performance. Moreover, a lower rank significantly degrades accuracy, whereas the performance remains relatively stable when rank exceeds 32. More ablation experiments can be found in the Supplementary Material.
+
+
+\begin{table}[]
+    \centering
+\renewcommand\arraystretch{1.2}
+\resizebox{0.8\linewidth}{!}{
+\begin{tabular}{ccccccccc}
+\toprule
+\multirow{2}{*}{} & \multicolumn{4}{c|}{\begin{tabular}[c]{@{}c@{}}Coordinates Embedding\\ (num of layers)\end{tabular}} & \multicolumn{4}{c}{\begin{tabular}[c]{@{}c@{}}Low-rank Injection\\ (rank)\end{tabular}} \\ \cmidrule{2-9} 
+                  & \faTimes          & 1               & 2              & \multicolumn{1}{c|}{4}         & \faTimes    & 8                  & 32                & 64                \\ \midrule
+ACC               & 90.91                            & 91.66           & 93.86          & \textbf{95.17}                 & 93.77                      & 84.69              & 95.17             & \textbf{95.76}    \\
+PSNR              & 35.98                            & 36.88           & 36.75          & \textbf{37.27}                 & 36.04                      & 37.08              & \textbf{37.27}    & 36.37             \\
+SSIM              & \textbf{0.9706}                  & 0.9590          & 0.9565         & 0.9611                         & 0.9639                     & \textbf{0.9656}    & 0.9611            & 0.9550            \\ \bottomrule
+\end{tabular}
+}
+\caption{Model performance with different components. Here, "\faTimes" indicates the absence of the corresponding component. For Coordinates Embedding, this means that only the Coordinate Fourier Mapper is used as an embedding feature. For Low-rank Injection, it signifies that features are concatenated and directly predicted by an MLP.}
+\label{table:ab}
+\vspace{-0pt}
+\end{table}
+
+
+
+% \section{Limitations and Future Work}
+
+% % Our approach shows promise but has some limitations. The visual quality of the watermarked images is lower than content-dependent methods, mainly due to INR's weaker feature representation compared to CNN. Additionally, INR fitting can be slow. Future work will aim to address these issues by combining CNN with INR to enhance both visual quality and embedding efficiency. We will also explore optimizing INR fitting to reduce training time and improve scalability.
+% While our approach demonstrates strong potential, it has certain limitations. The visual quality of watermarked images is inferior to that of content-dependent methods, primarily due to the weaker feature representation of INR compared to CNN. Additionally, the fitting process of INR can be computationally expensive. Future work will focus on mitigating these limitations by integrating CNN with INR to enhance both visual fidelity and embedding efficiency. Furthermore, we will explore optimization strategies to accelerate INR fitting, thereby reducing training time and improving scalability.
+
+\section{Conclusion}
+% In this paper, we introduce a novel watermarking framework (Mark$^{\infty }$) that leverages implicit neural representations and a resolution-independent coordinate sampling for efficient watermark embedding and extraction across images of infinite resolution.
+% Unlike traditional CNN-based methods that require processing entire images, our approach exploits a fixed grid sampling mechanism, enabling consistent watermark embedding across different scales while avoiding excessive computational overhead. 
+% Additionally, we introduce a hierarchical multi-scale coordinate embedding and low-rank watermark injection to enhance model robustness.
+% Experimental results show that our method outperforms existing approaches in both performance and computational efficiency. By capitalizing on the continuous nature of INRs, our framework significantly reduces training and inference costs.
+% These findings highlight the potential of INR-based methods for high resolution watermarking solutions, paving the way for future research into large-scale and high-resolution image watermarking applications. 
+
+In this paper, we introduce a novel watermarking framework that leverages implicit neural representations and a resolution-independent coordinate sampling for efficient watermark embedding and extraction across images of high resolution.
+Unlike CNN-based methods that require processing entire images, our approach can embed watermark at the pixel level, enabling watermark embedding across different scales while avoiding excessive computational overhead and ensuring robustness against extreme cropping and scaling distortions.
+Additionally, we introduce a hierarchical multi-scale coordinate embedding and low-rank watermark injection to enhance model robustness.
+Experimental results show that our method outperforms existing approaches in both performance and computational efficiency. 
+These findings highlight the potential of INR-based methods for high resolution watermarking solutions, offering valuable insights for future research on resolution-independent image watermarking.
+
+
+
+
+
+% \subsection{Retrieval of style files}
+
+
+% The style files for NeurIPS and other conference information are available on
+% the website at
+% \begin{center}
+%   \url{https://neurips.cc}
+% \end{center}
+% The file \verb+neurips_2025.pdf+ contains these instructions and illustrates the
+% various formatting requirements your NeurIPS paper must satisfy.
+
+
+% The only supported style file for NeurIPS 2025 is \verb+neurips_2025.sty+,
+% rewritten for \LaTeXe{}.  \textbf{Previous style files for \LaTeX{} 2.09,
+%   Microsoft Word, and RTF are no longer supported!}
+
+
+% The \LaTeX{} style file contains three optional arguments: \verb+final+, which
+% creates a camera-ready copy, \verb+preprint+, which creates a preprint for
+% submission to, e.g., arXiv, and \verb+nonatbib+, which will not load the
+% \verb+natbib+ package for you in case of package clash.
+
+
+% \paragraph{Preprint option}
+% If you wish to post a preprint of your work online, e.g., on arXiv, using the
+% NeurIPS style, please use the \verb+preprint+ option. This will create a
+% nonanonymized version of your work with the text ``Preprint. Work in progress.''
+% in the footer. This version may be distributed as you see fit, as long as you do not say which conference it was submitted to. Please \textbf{do
+%   not} use the \verb+final+ option, which should \textbf{only} be used for
+% papers accepted to NeurIPS.
+
+
+% At submission time, please omit the \verb+final+ and \verb+preprint+
+% options. This will anonymize your submission and add line numbers to aid
+% review. Please do \emph{not} refer to these line numbers in your paper as they
+% will be removed during generation of camera-ready copies.
+
+
+% The file \verb+neurips_2025.tex+ may be used as a ``shell'' for writing your
+% paper. All you have to do is replace the author, title, abstract, and text of
+% the paper with your own.
+
+
+% The formatting instructions contained in these style files are summarized in
+% Sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
+
+
+% \section{General formatting instructions}
+% \label{gen_inst}
+
+
+% The text must be confined within a rectangle 5.5~inches (33~picas) wide and
+% 9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).  Use 10~point
+% type with a vertical spacing (leading) of 11~points.  Times New Roman is the
+% preferred typeface throughout, and will be selected for you by default.
+% Paragraphs are separated by \nicefrac{1}{2}~line space (5.5 points), with no
+% indentation.
+
+
+% The paper title should be 17~point, initial caps/lower case, bold, centered
+% between two horizontal rules. The top rule should be 4~points thick and the
+% bottom rule should be 1~point thick. Allow \nicefrac{1}{4}~inch space above and
+% below the title to rules. All pages should start at 1~inch (6~picas) from the
+% top of the page.
+
+
+% For the final version, authors' names are set in boldface, and each name is
+% centered above the corresponding address. The lead author's name is to be listed
+% first (left-most), and the co-authors' names (if different address) are set to
+% follow. If there is only one co-author, list both author and co-author side by
+% side.
+
+
+% Please pay special attention to the instructions in Section \ref{others}
+% regarding figures, tables, acknowledgments, and references.
+
+% \section{Headings: first level}
+% \label{headings}
+
+
+% All headings should be lower case (except for first word and proper nouns),
+% flush left, and bold.
+
+
+% First-level headings should be in 12-point type.
+
+
+% \subsection{Headings: second level}
+
+
+% Second-level headings should be in 10-point type.
+
+
+% \subsubsection{Headings: third level}
+
+
+% Third-level headings should be in 10-point type.
+
+
+% \paragraph{Paragraphs}
+
+
+% There is also a \verb+\paragraph+ command available, which sets the heading in
+% bold, flush left, and inline with the text, with the heading followed by 1\,em
+% of space.
+
+
+% \section{Citations, figures, tables, references}
+% \label{others}
+
+
+% These instructions apply to everyone.
+
+
+% \subsection{Citations within the text}
+
+
+% The \verb+natbib+ package will be loaded for you by default.  Citations may be
+% author/year or numeric, as long as you maintain internal consistency.  As to the
+% format of the references themselves, any style is acceptable as long as it is
+% used consistently.
+
+
+% The documentation for \verb+natbib+ may be found at
+% \begin{center}
+%   \url{http://mirrors.ctan.org/macros/latex/contrib/natbib/natnotes.pdf}
+% \end{center}
+% Of note is the command \verb+\citet+, which produces citations appropriate for
+% use in inline text.  For example,
+% \begin{verbatim}
+%    \citet{hasselmo} investigated\dots
+% \end{verbatim}
+% produces
+% \begin{quote}
+%   Hasselmo, et al.\ (1995) investigated\dots
+% \end{quote}
+
+
+% If you wish to load the \verb+natbib+ package with options, you may add the
+% following before loading the \verb+neurips_2025+ package:
+% \begin{verbatim}
+%    \PassOptionsToPackage{options}{natbib}
+% \end{verbatim}
+
+
+% If \verb+natbib+ clashes with another package you load, you can add the optional
+% argument \verb+nonatbib+ when loading the style file:
+% \begin{verbatim}
+%    \usepackage[nonatbib]{neurips_2025}
+% \end{verbatim}
+
+
+% As submission is double blind, refer to your own published work in the third
+% person. That is, use ``In the previous work of Jones et al.\ [4],'' not ``In our
+% previous work [4].'' If you cite your other papers that are not widely available
+% (e.g., a journal paper under review), use anonymous author names in the
+% citation, e.g., an author of the form ``A.\ Anonymous'' and include a copy of the anonymized paper in the supplementary material.
+
+
+% \subsection{Footnotes}
+
+
+% Footnotes should be used sparingly.  If you do require a footnote, indicate
+% footnotes with a number\footnote{Sample of the first footnote.} in the
+% text. Place the footnotes at the bottom of the page on which they appear.
+% Precede the footnote with a horizontal rule of 2~inches (12~picas).
+
+
+% Note that footnotes are properly typeset \emph{after} punctuation
+% marks.\footnote{As in this example.}
+
+
+% \subsection{Figures}
+
+
+% \begin{figure}
+%   \centering
+%   \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+%   \caption{Sample figure caption.}
+% \end{figure}
+
+
+% All artwork must be neat, clean, and legible. Lines should be dark enough for
+% purposes of reproduction. The figure number and caption always appear after the
+% figure. Place one line space before the figure caption and one line space after
+% the figure. The figure caption should be lower case (except for first word and
+% proper nouns); figures are numbered consecutively.
+
+
+% You may use color figures.  However, it is best for the figure captions and the
+% paper body to be legible if the paper is printed in either black/white or in
+% color.
+
+
+% \subsection{Tables}
+
+
+% All tables must be centered, neat, clean and legible.  The table number and
+% title always appear before the table.  See Table~\ref{sample-table}.
+
+
+% Place one line space before the table title, one line space after the
+% table title, and one line space after the table. The table title must
+% be lower case (except for first word and proper nouns); tables are
+% numbered consecutively.
+
+
+% Note that publication-quality tables \emph{do not contain vertical rules.} We
+% strongly suggest the use of the \verb+booktabs+ package, which allows for
+% typesetting high-quality, professional tables:
+% \begin{center}
+%   \url{https://www.ctan.org/pkg/booktabs}
+% \end{center}
+% This package was used to typeset Table~\ref{sample-table}.
+
+
+% \begin{table}
+%   \caption{Sample table title}
+%   \label{sample-table}
+%   \centering
+%   \begin{tabular}{lll}
+%     \toprule
+%     \multicolumn{2}{c}{Part}                   \\
+%     \cmidrule(r){1-2}
+%     Name     & Description     & Size ($\mu$m) \\
+%     \midrule
+%     Dendrite & Input terminal  & $\sim$100     \\
+%     Axon     & Output terminal & $\sim$10      \\
+%     Soma     & Cell body       & up to $10^6$  \\
+%     \bottomrule
+%   \end{tabular}
+% \end{table}
+
+% \subsection{Math}
+% Note that display math in bare TeX commands will not create correct line numbers for submission. Please use LaTeX (or AMSTeX) commands for unnumbered display math. (You really shouldn't be using \$\$ anyway; see \url{https://tex.stackexchange.com/questions/503/why-is-preferable-to} and \url{https://tex.stackexchange.com/questions/40492/what-are-the-differences-between-align-equation-and-displaymath} for more information.)
+
+% \subsection{Final instructions}
+
+% Do not change any aspects of the formatting parameters in the style files.  In
+% particular, do not modify the width or length of the rectangle the text should
+% fit into, and do not change font sizes (except perhaps in the
+% \textbf{References} section; see below). Please note that pages should be
+% numbered.
+
+
+% \section{Preparing PDF files}
+
+
+% Please prepare submission files with paper size ``US Letter,'' and not, for
+% example, ``A4.''
+
+
+% Fonts were the main cause of problems in the past years. Your PDF file must only
+% contain Type 1 or Embedded TrueType fonts. Here are a few instructions to
+% achieve this.
+
+
+% \begin{itemize}
+
+
+% \item You should directly generate PDF files using \verb+pdflatex+.
+
+
+% \item You can check which fonts a PDF files uses.  In Acrobat Reader, select the
+%   menu Files$>$Document Properties$>$Fonts and select Show All Fonts. You can
+%   also use the program \verb+pdffonts+ which comes with \verb+xpdf+ and is
+%   available out-of-the-box on most Linux machines.
+
+
+% \item \verb+xfig+ "patterned" shapes are implemented with bitmap fonts.  Use
+%   "solid" shapes instead.
+
+
+% \item The \verb+\bbold+ package almost always uses bitmap fonts.  You should use
+%   the equivalent AMS Fonts:
+% \begin{verbatim}
+%    \usepackage{amsfonts}
+% \end{verbatim}
+% followed by, e.g., \verb+\mathbb{R}+, \verb+\mathbb{N}+, or \verb+\mathbb{C}+
+% for $\mathbb{R}$, $\mathbb{N}$ or $\mathbb{C}$.  You can also use the following
+% workaround for reals, natural and complex:
+% \begin{verbatim}
+%    \newcommand{\RR}{I\!\!R} %real numbers
+%    \newcommand{\Nat}{I\!\!N} %natural numbers
+%    \newcommand{\CC}{I\!\!\!\!C} %complex numbers
+% \end{verbatim}
+% Note that \verb+amsfonts+ is automatically loaded by the \verb+amssymb+ package.
+
+
+% \end{itemize}
+
+
+% If your file contains type 3 fonts or non embedded TrueType fonts, we will ask
+% you to fix it.
+
+
+% \subsection{Margins in \LaTeX{}}
+
+
+% Most of the margin problems come from figures positioned by hand using
+% \verb+\special+ or other commands. We suggest using the command
+% \verb+\includegraphics+ from the \verb+graphicx+ package. Always specify the
+% figure width as a multiple of the line width as in the example below:
+% \begin{verbatim}
+%    \usepackage[pdftex]{graphicx} ...
+%    \includegraphics[width=0.8\linewidth]{myfile.pdf}
+% \end{verbatim}
+% See Section 4.4 in the graphics bundle documentation
+% (\url{http://mirrors.ctan.org/macros/latex/required/graphics/grfguide.pdf})
+
+
+% A number of width problems arise when \LaTeX{} cannot properly hyphenate a
+% line. Please give LaTeX hyphenation hints using the \verb+\-+ command when
+% necessary.
+
+% \begin{ack}
+% Use unnumbered first level headings for the acknowledgments. All acknowledgments
+% go at the end of the paper before the list of references. Moreover, you are required to declare
+% funding (financial activities supporting the submitted work) and competing interests (related financial activities outside the submitted work).
+% More information about this disclosure can be found at: \url{https://neurips.cc/Conferences/2025/PaperInformation/FundingDisclosure}.
+
+
+% Do {\bf not} include this section in the anonymized submission, only in the final paper. You can use the \texttt{ack} environment provided in the style file to automatically hide this section in the anonymized submission.
+% \end{ack}
+
+
+
+% \section*{References}
+
+
+% References follow the acknowledgments in the camera-ready paper. Use unnumbered first-level heading for
+% the references. Any choice of citation style is acceptable as long as you are
+% consistent. It is permissible to reduce the font size to \verb+small+ (9 point)
+% when listing the references.
+% Note that the Reference section does not count towards the page limit.
+% \medskip
+
+
+{
+\small
+
+\bibliographystyle{IEEEtran} 
+\bibliography{main.bib}
+
+
+% [1] Alexander, J.A.\ \& Mozer, M.C.\ (1995) Template-based algorithms for
+% connectionist rule extraction. In G.\ Tesauro, D.S.\ Touretzky and T.K.\ Leen
+% (eds.), {\it Advances in Neural Information Processing Systems 7},
+% pp.\ 609--616. Cambridge, MA: MIT Press.
+
+
+% [2] Bower, J.M.\ \& Beeman, D.\ (1995) {\it The Book of GENESIS: Exploring
+%   Realistic Neural Models with the GEneral NEural SImulation System.}  New York:
+% TELOS/Springer--Verlag.
+
+
+% [3] Hasselmo, M.E., Schnell, E.\ \& Barkai, E.\ (1995) Dynamics of learning and
+% recall at excitatory recurrent synapses and cholinergic modulation in rat
+% hippocampal region CA3. {\it Journal of Neuroscience} {\bf 15}(7):5249-5262.
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+
+\section{Technical Appendices and Supplementary Material}
+
+\subsection{Details of the Noise Layer}
+The combined noise layer is implemented using Kornia \cite{eriba2019kornia}, incorporating various transformations such as Identity, Rotation, Cropping, Translation, Scaling, Shearing, Dropout, Cropout, Color Transformation, JPEG Compression, Gaussian Filtering, and Gaussian Noise. These transformations are applied as follows:
+\begin{itemize}
+    \item \textbf{Rotation:} Random rotation within the angle range of $[-30^\circ, 30^\circ]$.
+    \item \textbf{Cropping:} Randomly retains a scale of $[0.5, 1]$ of the original image.
+    \item \textbf{Translation:} Generates random displacements of $[-0.1, 0.1]$ times the image's edge length along the x and y axes.
+    \item \textbf{Scaling:} Random scaling within a factor of $[0.5, 1.2]$.
+    \item \textbf{Shearing:} Random shear transformation with an angle range of $[-0.1, 0.1]$.
+    \item \textbf{Dropout:} Randomly discards $[10\%, 30\%]$ of the pixels.
+    \item \textbf{Cropout:} Randomly discards blocks of the image with a scale of $[0.05, 0.1]$.
+    \item \textbf{Color Transformation:} Perturbs Brightness, Saturation, and Hue with intensities of $[-0.4, 0.4]$, $[-0.4, 0.4]$, and $[-0.1, 0.1]$, respectively.
+    \item \textbf{JPEG Compression:} Applies random quality factors between $[50, 100]$.
+    \item \textbf{Gaussian Filter:} Applies Gaussian filters with kernel sizes in the range of $[3, 8]$ and intensities of $[0.05, 0.1]$ with $\sigma \in [0.1, 2]$.
+    \item \textbf{Gaussian Noise:} Adds Gaussian noise with a mean of $0$ and variance of $0.01$.
+\end{itemize}
+During training, a random noise type is selected and applied to perturb the watermarked image. 
+
+\subsection{The Role of Hyperparameter $\gamma$}
+In the section "Low-rank Watermark Injection based on Implicit Neural Representations", we introduced the $\gamma$ parameter to regulate the embedding strength of the watermark. Since our INR-based watermarking approach essentially functions as a template watermark, its pattern remains independent of the carrier image. As a result, the model naturally tends to generate sparse high-frequency textures to minimize visual loss, leading to significant spatial inefficiencies.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1\linewidth]{resource/diff_gamma.pdf}
+
+\caption{Different watermark styles generated by the hyperparameter $\gamma$.}
+\label{fig:diff_gamma}
+\vspace{-10pt}
+\end{figure}
+
+
+As illustrated in Figure \ref{fig:diff_gamma}, the left side shows the watermark generated without constraints. A substantial portion of the area contains null values, which not only wastes available space but also poses a critical issue—If the image is cropped to a region containing only null values, the essential watermark information may be lost entirely during transmission. To address this, we impose a constraint on the embedding strength, ensuring that the watermark is more uniformly distributed across the image.
+
+Moreover, we empirically set $\gamma=0.02$, as it maintains a PSNR of approximately 34 while preserving good visual quality, even for a completely randomized watermark template. If $\gamma$ is reduced further, the watermark's robustness deteriorates due to insufficient redundancy.
+
+
+\subsection{Visualizing the effect of different structures on watermarking}
+We compare the differences in watermark patterns generated by different architectural designs. As shown in Figure \ref{fig:diff_mark}, (a) produces an overly simplistic pattern lacking scale variations, leading to the worst performance. Although (c) introduces more variation, its complexity remains insufficient compared to (b), increasing the risk of information loss. By integrating coordinate embedding with low-rank watermark injection, our approach ensures that watermark patterns maintain consistent structural characteristics and complexity across different scales, enabling reliable decoding across varying image resolutions.
+
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1\linewidth]{resource/diff_mark.pdf}
+
+\caption{Watermark patterns resulting from different model architectures. (a) shows the results using only coordinate fourier mapping without coordinate embedding. (c) presents the results of watermark injection using simple feature concatenation.}
+\label{fig:diff_mark}
+\vspace{-10pt}
+\end{figure}
+
+\subsection{TrustMark Settings in Baseline} \label{trust_mark_setting}
+Since TrustMark does not provide a training script, we rely on its pre-trained weights for testing. However, TrustMark's pre-trained watermarks are 100 bits long and are available in four open-source versions. We use the version with a 40-bit payload (BCH\_SUPER), with the remaining 60 bits reserved for error correction and versioning. To ensure a relatively fair comparison, we modify the decoding process: after extracting the full 100-bit sequence, we first apply error correction to the 40 valid bits and discard the remaining 60 bits. The evaluation is then based solely on the decoding accuracy of the 40 valid bits.
+
+\subsection{More Results}
+In the main text, we present visualization results across different resolutions. Here, we provide additional experimental results, as shown in Figure \ref{fig:vis}. We randomly select various resolutions for embedding, where each group's first row represents the cover images, the second row shows the watermarked images, and the third row displays the watermarks. It can be observed that while the watermarks exhibit scale-dependent variations at different resolutions, they consistently retain a similar stripe-like structure and maintain considerable complexity at each resolution. This ensures the successful decoding of watermark information across varying image scales.
+
+
+\begin{figure*}[ht]
+\centering
+\includegraphics[width=1\textwidth]{resource/vis.png}
+
+\caption{Visualization results at different resolutions.}
+\label{fig:vis}
+% \vspace{-10pt}
+\end{figure*}
+
+
+\subsection{Limitations and Future Work} \label{limitation}
+
+% Our approach shows promise but has some limitations. The visual quality of the watermarked images is lower than content-dependent methods, mainly due to INR's weaker feature representation compared to CNN. Additionally, INR fitting can be slow. Future work will aim to address these issues by combining CNN with INR to enhance both visual quality and embedding efficiency. We will also explore optimizing INR fitting to reduce training time and improve scalability.
+While our approach demonstrates strong potential, it has certain limitations. The visual quality of watermarked images is inferior to that of content-dependent methods, primarily due to the weaker feature representation of INR compared to CNN. Additionally, the fitting process of INR can be computationally expensive. Future work will focus on mitigating these limitations by integrating CNN with INR to enhance both visual fidelity and embedding efficiency. Furthermore, we will explore optimization strategies to accelerate INR fitting, thereby reducing training time and improving scalability.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+\section*{NeurIPS Paper Checklist}
+
+%%% BEGIN INSTRUCTIONS %%%
+The checklist is designed to encourage best practices for responsible machine learning research, addressing issues of reproducibility, transparency, research ethics, and societal impact. Do not remove the checklist: {\bf The papers not including the checklist will be desk rejected.} The checklist should follow the references and follow the (optional) supplemental material.  The checklist does NOT count towards the page
+limit. 
+
+Please read the checklist guidelines carefully for information on how to answer these questions. For each question in the checklist:
+\begin{itemize}
+    \item You should answer \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item \answerNA{} means either that the question is Not Applicable for that particular paper or the relevant information is Not Available.
+    \item Please provide a short (1–2 sentence) justification right after your answer (even for NA). 
+   % \item {\bf The papers not including the checklist will be desk rejected.}
+\end{itemize}
+
+{\bf The checklist answers are an integral part of your paper submission.} They are visible to the reviewers, area chairs, senior area chairs, and ethics reviewers. You will be asked to also include it (after eventual revisions) with the final version of your paper, and its final version will be published with the paper.
+
+The reviewers of your paper will be asked to use the checklist as one of the factors in their evaluation. While "\answerYes{}" is generally preferable to "\answerNo{}", it is perfectly acceptable to answer "\answerNo{}" provided a proper justification is given (e.g., "error bars are not reported because it would be too computationally expensive" or "we were unable to find the license for the dataset we used"). In general, answering "\answerNo{}" or "\answerNA{}" is not grounds for rejection. While the questions are phrased in a binary way, we acknowledge that the true answer is often more nuanced, so please just use your best judgment and write a justification to elaborate. All supporting evidence can appear either in the main paper or the supplemental material, provided in appendix. If you answer \answerYes{} to a question, in the justification please point to the section(s) where related material for the question can be found.
+
+IMPORTANT, please:
+\begin{itemize}
+    \item {\bf Delete this instruction block, but keep the section heading ``NeurIPS Paper Checklist"},
+    \item  {\bf Keep the checklist subsection headings, questions/answers and guidelines below.}
+    \item {\bf Do not modify the questions and only use the provided macros for your answers}.
+\end{itemize} 
+ 
+
+%%% END INSTRUCTIONS %%%
+
+
+\begin{enumerate}
+
+\item {\bf Claims}
+    \item[] Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{introduction} explains our contributions
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the abstract and introduction do not include the claims made in the paper.
+        \item The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. 
+        \item The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. 
+        \item It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 
+    \end{itemize}
+
+\item {\bf Limitations}
+    \item[] Question: Does the paper discuss the limitations of the work performed by the authors?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{visual} and  Supplementary Material \ref{limitation} explain our limitations
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. 
+        \item The authors are encouraged to create a separate "Limitations" section in their paper.
+        \item The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be.
+        \item The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated.
+        \item The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon.
+        \item The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size.
+        \item If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness.
+        \item While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren't acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an important role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations.
+    \end{itemize}
+
+\item {\bf Theory assumptions and proofs}
+    \item[] Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{low_rank} gives the full proof.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not include theoretical results. 
+        \item All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced.
+        \item All assumptions should be clearly stated or referenced in the statement of any theorems.
+        \item The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. 
+        \item Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material.
+        \item Theorems and Lemmas that the proof relies upon should be properly referenced. 
+    \end{itemize}
+
+    \item {\bf Experimental result reproducibility}
+    \item[] Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)?
+    \item[] Answer: \answerYes{}{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{setting} gives details.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not include experiments.
+        \item If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not.
+        \item If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. 
+        \item Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed.
+        \item While NeurIPS does not require releasing code, the conference does require all submissions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example
+        \begin{enumerate}
+            \item If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm.
+            \item If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully.
+            \item If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset).
+            \item We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results.
+        \end{enumerate}
+    \end{itemize}
+
+
+\item {\bf Open access to data and code}
+    \item[] Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{setting} and Supplementary Material \ref{trust_mark_setting}  give details.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that paper does not include experiments requiring code.
+        \item Please see the NeurIPS code and data submission guidelines (\url{https://nips.cc/public/guides/CodeSubmissionPolicy}) for more details.
+        \item While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark).
+        \item The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines (\url{https://nips.cc/public/guides/CodeSubmissionPolicy}) for more details.
+        \item The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc.
+        \item The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why.
+        \item At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable).
+        \item Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted.
+    \end{itemize}
+
+
+\item {\bf Experimental setting/details}
+    \item[] Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer, etc.) necessary to understand the results?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{setting} gives details.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not include experiments.
+        \item The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them.
+        \item The full details can be provided either with the code, in appendix, or as supplemental material.
+    \end{itemize}
+
+\item {\bf Experiment statistical significance}
+    \item[] Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{experiments} gives details.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not include experiments.
+        \item The authors should answer "Yes" if the results are accompanied by error bars, confidence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper.
+        \item The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions).
+        \item The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.)
+        \item The assumptions made should be given (e.g., Normally distributed errors).
+        \item It should be clear whether the error bar is the standard deviation or the standard error of the mean.
+        \item It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96\% CI, if the hypothesis of Normality of errors is not verified.
+        \item For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates).
+        \item If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text.
+    \end{itemize}
+
+\item {\bf Experiments compute resources}
+    \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: Section \ref{setting} gives details.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not include experiments.
+        \item The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage.
+        \item The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. 
+        \item The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn't make it into the paper). 
+    \end{itemize}
+    
+\item {\bf Code of ethics}
+    \item[] Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics \url{https://neurips.cc/public/EthicsGuidelines}?
+    \item[] Answer: \answerYes{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: this paper ensures that the research adheres to ethical standards and the NeurIPS Code of Ethics.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics.
+        \item If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics.
+        \item The authors should make sure to preserve anonymity (e.g., if there is a special consideration due to laws or regulations in their jurisdiction).
+    \end{itemize}
+
+
+\item {\bf Broader impacts}
+    \item[] Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed?
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: The paper is no societal impact of the work performed.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that there is no societal impact of the work performed.
+        \item If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact.
+        \item Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations.
+        \item The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster.
+        \item The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology.
+        \item If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML).
+    \end{itemize}
+    
+\item {\bf Safeguards}
+    \item[] Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)?
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: the paper poses no such risks.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper poses no such risks.
+        \item Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. 
+        \item Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images.
+        \item We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort.
+    \end{itemize}
+
+\item {\bf Licenses for existing assets}
+    \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: he paper does not use existing assets.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not use existing assets.
+        \item The authors should cite the original paper that produced the code package or dataset.
+        \item The authors should state which version of the asset is used and, if possible, include a URL.
+        \item The name of the license (e.g., CC-BY 4.0) should be included for each asset.
+        \item For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided.
+        \item If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, \url{paperswithcode.com/datasets} has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset.
+        \item For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided.
+        \item If this information is not available online, the authors are encouraged to reach out to the asset's creators.
+    \end{itemize}
+
+\item {\bf New assets}
+    \item[] Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: the paper does not release new assets.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not release new assets.
+        \item Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. 
+        \item The paper should discuss whether and how consent was obtained from people whose asset is used.
+        \item At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file.
+    \end{itemize}
+
+\item {\bf Crowdsourcing and research with human subjects}
+    \item[] Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? 
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: the paper does not involve crowdsourcing nor research with human subjects.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not involve crowdsourcing nor research with human subjects.
+        \item Including this information in the supplemental material is fine, but if the main contribution of the paper involves human subjects, then as much detail as possible should be included in the main paper. 
+        \item According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 
+    \end{itemize}
+
+\item {\bf Institutional review board (IRB) approvals or equivalent for research with human subjects}
+    \item[] Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained?
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: the paper does not involve crowdsourcing nor research with human subjects.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the paper does not involve crowdsourcing nor research with human subjects.
+        \item Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. 
+        \item We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. 
+        \item For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review.
+    \end{itemize}
+
+\item {\bf Declaration of LLM usage}
+    \item[] Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does not impact the core methodology, scientific rigorousness, or originality of the research, declaration is not required.
+    %this research? 
+    \item[] Answer: \answerNA{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
+    \item[] Justification: the core method development in this research does not involve LLMs as any important, original, or non-standard components.
+    \item[] Guidelines:
+    \begin{itemize}
+        \item The answer NA means that the core method development in this research does not involve LLMs as any important, original, or non-standard components.
+        \item Please refer to our LLM policy (\url{https://neurips.cc/Conferences/2025/LLM}) for what should or should not be described.
+    \end{itemize}
+
+\end{enumerate}
+
+
+\end{document}

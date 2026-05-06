@@ -1,11 +1,34 @@
-FastTools
-data
-.vscode
-__pycache__
+FastTools/
+data/
+.vscode/
+.codex
+__pycache__/
 *.pyc
+
+# Generated images and exported samples
 *.png
 *.jpg
-output
-liif
-*.ckpt
+*.jpeg
+*.bmp
+*.webp
 
+# Training/evaluation outputs
+output/
+output
+outputs/
+output_*/
+local_watermark_crop_eval/
+lightning_logs/
+checkpoints/
+wandb/
+runs/
+logs/
+
+# Model checkpoints and tensor dumps
+*.ckpt
+*.pt
+*.pth
+*.zip
+
+liif/
+zl/

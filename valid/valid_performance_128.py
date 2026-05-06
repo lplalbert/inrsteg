@@ -38,7 +38,7 @@ noiser = Noiser(
         # ("Identity", None),
         # ("GaussianNoise", {"std": 0.01}),
         # ("GaussianNoise", {"std": 0.05}),
-        # ("KorniaJpeg", {"min_q": 50, "max_q": 51}),
+        ("KorniaJpeg", {"min_q": 50, "max_q": 51}),
         # ("KorniaJpeg", {"min_q": 60, "max_q": 61}),
         # ("KorniaJpeg", {"min_q": 80, "max_q": 81}),
         # ("Crop", {"ratio": [0.6, 0.6]}),

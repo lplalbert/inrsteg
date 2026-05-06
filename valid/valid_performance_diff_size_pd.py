@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import sys
+import time
 sys.path.append("/home/light_sun/workspace/inrmark_2/inrsteg-final_v1")
 from FastTools.dataset.dataset import read_img
 from FastTools.metre import PSNR
@@ -19,7 +20,7 @@ import torch.nn.functional as F
 
 cfg_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/v6_30bits.yaml"
 ckpt_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v6_30bits/lightning_logs/version_0/checkpoints/ckpt-epoch=109-val_loss=0.0481.ckpt"
-device = "cuda:0"
+device = "cuda:3"
 args = Args().load(cfg_path)
 model = INRMark.load_from_checkpoint(ckpt_path, args=args).to(device).eval()
 
@@ -38,24 +39,26 @@ coords = generate_grid_coordinates((-1, -1), 2, img_size).unsqueeze(0).to(device
 total_acc = 0
 total_psnr = 0
 total_ssim = 0
+total_inference_time = 0
 n = 0
 patch_size = 128
 overlap = 0
 
 @torch.no_grad()
-def render_high_res_image(model, img, coords, msg, patch_size=128, overlap=64, fixed_psnr=None):
-    """逐块渲染高分辨率图像"""
+def render_high_res_image_parallel(model, img, coords, msg, patch_size=128, overlap=64, fixed_psnr=None):
+    """并行分块渲染高分辨率图像"""
     _, _, h, w = img.shape
-
-    output = torch.zeros_like(img)
-    count_map = torch.zeros_like(img)  # 用于记录每个像素被渲染的次数
 
     # 计算块的数量
     num_patches_h = (h - overlap) // (patch_size - overlap)
     num_patches_w = (w - overlap) // (patch_size - overlap)
-
-    # 逐块渲染
-    for i in tqdm(range(num_patches_h), desc="Rendering rows"):
+    
+    # 准备所有块的输入
+    patches = []
+    patch_coords_list = []
+    positions = []
+    
+    for i in range(num_patches_h):
         for j in range(num_patches_w):
             # 计算当前块的坐标范围
             h_start = i * (patch_size - overlap)
@@ -66,19 +69,37 @@ def render_high_res_image(model, img, coords, msg, patch_size=128, overlap=64, f
             # 提取当前块
             patch = img[:, :, h_start:h_end, w_start:w_end]
             patch_coords = coords[:, h_start:h_end, w_start:w_end, :]
-            # print(patch_coords.shape, patch.shape)
-            # 渲染当前块
-            wm_patch, _ = model.render_img(patch_coords, msg, patch)
-            if fixed_psnr:
-                wm_patch = clip_psnr(wm_patch, patch, fixed_psnr, over_clip=True)
-
-            # 将渲染结果写入输出图像
+            
+            patches.append(patch)
+            patch_coords_list.append(patch_coords)
+            positions.append((h_start, h_end, w_start, w_end))
+    
+    # 批量处理所有块
+    if patches:
+        patches_batch = torch.cat(patches, dim=0)
+        patch_coords_batch = torch.cat(patch_coords_list, dim=0)
+        msg_batch = msg.repeat(len(patches), 1)
+        
+        # 并行渲染所有块
+        wm_patches, _ = model.render_img(patch_coords_batch, msg_batch, patches_batch)
+        
+        if fixed_psnr:
+            wm_patches = clip_psnr(wm_patches, patches_batch, fixed_psnr, over_clip=True)
+        
+        # 重构输出图像
+        output = torch.zeros_like(img)
+        count_map = torch.zeros_like(img)
+        
+        for idx, (h_start, h_end, w_start, w_end) in enumerate(positions):
+            wm_patch = wm_patches[idx:idx+1]
             output[:, :, h_start:h_end, w_start:w_end] += wm_patch
             count_map[:, :, h_start:h_end, w_start:w_end] += 1
-
-    # 平均重叠区域
-    output = output / count_map
-    return output
+        
+        # 平均重叠区域
+        output = output / count_map
+        return output
+    else:
+        return img
 
 noiser = Noiser(
     [
@@ -102,23 +123,26 @@ noiser = Noiser(
         ("Rotate", None),
     ]
 )
+
 for img in tqdm(imgs):
     img_path = os.path.join(data_path, img)
     img = read_img(img_path)
     img = ts(img).unsqueeze(0).to(device)
     msg = gen_random_msg(args.msg_len).unsqueeze(0).to(device)
-    # print(msg.size())
-    # print(coords.size(), msg.size(), img.size())
-    wm_img = render_high_res_image(model, img, coords, msg, patch_size, overlap)
-    # wm_img, mask = model.render_img(coords, msg, img)
-    # 存储到本地
-    # break
+    
+    # 测量推理时间
 
+    start_time = time.time()
+    wm_img = render_high_res_image_parallel(model, img, coords, msg, patch_size, overlap)
+    end_time = time.time()
+    inference_time_ms = (end_time - start_time) * 1000
+    print(f"Inference time: {inference_time_ms} ms")
+    if n != 0:
+        total_inference_time += inference_time_ms
+    
     if fixed_psnr:
         wm_img = clip_psnr(wm_img, img, fixed_psnr, over_clip=True)
     noised_img, _ = noiser(wm_img, img)
-    # noised_img = wm_img
-    
     # 缩放到128x128
     noised_img = F.interpolate(noised_img, size=(128, 128), mode="bilinear")
     with torch.no_grad():
@@ -127,18 +151,16 @@ for img in tqdm(imgs):
     msg = msg[:, :msg_len]
     acc = msg_acc(predict_msg, msg)
     psnr = PSNR(wm_img, img)
-    print(psnr, acc)
     ssim = SSIM(wm_img, img)
     total_acc += acc.item()
     total_psnr += psnr.item()
     total_ssim += ssim.item()
 
-
-    msg_str = ''.join(map(lambda x: str(int(x)), msg.squeeze(0).cpu()))
+    # msg_str = ''.join(map(lambda x: str(int(x)), msg.squeeze(0).cpu()))
     # utils.save_image(wm_img, os.path.join("/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/div2k_imgs", "{}.png".format(msg_str)))
     n += 1
-    pass
 
 print("acc: ", total_acc / n)
 print("psnr: ", total_psnr / n)
 print("ssim: ", total_ssim / n)
+print("Average inference time: {:.2f} ms".format(total_inference_time / (n-1)))

@@ -1,5 +1,4 @@
 # Standard library imports
-import math
 from typing import Optional, Tuple
 
 # Third-party imports
@@ -16,20 +15,14 @@ from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity as LPI
 from FastTools.light.Engine import EngineModel, EngineTrainer
 from FastTools.light.LightModel import LModel
 from FastTools.metre import PSNR
-from FastTools.module.common import Conv2dBlock, ConvBNRelu, MLP, LinearBlock
+from FastTools.module.common import Conv2dBlock, ConvBNRelu, MLP
 from FastTools.steganography.Noiser.Noiser import Noiser
 from FastTools.steganography.utils.common import msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
-from FastTools.util.utils import weights_init
 from dataset.Mydataset import MyDataset, generate_grid_coordinates
-from model.lpips import REC_LPIPS
 
-# 这是alpha0.02的效果， fix psnr 36
-# 在lowrank里面添加更多的正则来帮助学习
-# 加深网络
-
-
+# 重新训练的 只会在80%左右
 class SEBlock(nn.Module):
     def __init__(self, channel, reduction=16):
         super(SEBlock, self).__init__()
@@ -48,12 +41,11 @@ class SEBlock(nn.Module):
         return x * y.expand_as(x)
 
 
-
 class FourierUnit(nn.Module):
     def __init__(self, in_channels, out_channels, groups=1):
         super().__init__()
         self.groups = groups
-        
+
         # 调整通道数处理：输入输出通道数翻倍（实部+虚部）
         self.conv_layer = nn.Conv2d(
             in_channels=in_channels * 2,  # 处理实部和虚部
@@ -64,7 +56,7 @@ class FourierUnit(nn.Module):
         )
         self.bn = nn.BatchNorm2d(out_channels * 2)
         self.relu = nn.ReLU(inplace=True)
-        
+
         self.out_layer = nn.Sequential(
             nn.Conv2d(out_channels+in_channels, out_channels, 3, 1, 1),
             nn.BatchNorm2d(out_channels),
@@ -73,58 +65,34 @@ class FourierUnit(nn.Module):
 
     def forward(self, x):
         batch, c, h, w = x.shape
-        
+
         # 新版FFT处理
         # 步骤1：执行FFT变换
         fft = torch.fft.rfft2(x, norm='ortho')  # 输出复数张量 [B,C,H,W//2+1]
-        
+
         # 分离实部和虚部
         real = fft.real  # [B,C,H,W//2+1]
         imag = fft.imag  # [B,C,H,W//2+1]
-        
+
         # 拼接实部虚部作为通道维度
         fft_combined = torch.cat([real, imag], dim=1)  # [B, 2*C, H, W//2+1]
-        
+
         # 步骤2：频域卷积处理
-        fft_processed = self.conv_layer(fft_combined)  # [B, 2*out_C, H, W//2+1]
+        fft_processed = self.conv_layer(
+            fft_combined)  # [B, 2*out_C, H, W//2+1]
         fft_processed = self.relu(self.bn(fft_processed))
-        
+
         # 拆分处理后的实部虚部
-        real_new, imag_new = torch.chunk(fft_processed, 2, dim=1)  # 各[B, out_C, H, W//2+1]
-        
+        real_new, imag_new = torch.chunk(
+            fft_processed, 2, dim=1)  # 各[B, out_C, H, W//2+1]
+
         # 步骤3：逆FFT变换
         fft_new = torch.complex(real_new, imag_new)  # 重建复数张量
-        output = torch.fft.irfft2(fft_new, s=(h, w), norm='ortho')  # [B, out_C, H, W]
+        output = torch.fft.irfft2(fft_new, s=(
+            h, w), norm='ortho')  # [B, out_C, H, W]
         output = self.out_layer(torch.cat([output, x], dim=1))
         return output
 
-
-
-class FourierFeatMapping(nn.Module):
-    # 基于理论Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains
-    def __init__(self, in_dim, map_scale=16, map_size=4, tunable=False):
-        super().__init__()
-
-        B = torch.normal(0., map_scale, size=(map_size//2, in_dim))
-
-        if tunable:
-            self.B = nn.Parameter(B, requires_grad=True)
-        else:
-            self.register_buffer('B', B)
-
-    @property
-    def out_dim(self):
-        return 2 * self.B.shape[0]
-
-    @property
-    def flops(self):
-        return self.B.shape[0] * self.B.shape[1]
-
-    def forward(self, x):
-        x_proj = torch.matmul(x, self.B.T)
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
-    
-    
 
 class LowRankFusionBlock(nn.Module):
     def __init__(self, x_dim, y_dim, rank_dim=16, out_dim=None):
@@ -139,32 +107,26 @@ class LowRankFusionBlock(nn.Module):
         self.x_fc = nn.Linear(self.x_dim, self.rank_dim, bias=False)
         self.y_fc = nn.Linear(self.y_dim, self.rank_dim, bias=False)
         self.out_fc = nn.Linear(self.rank_dim, self.out_dim, bias=False)
-        self.act = nn.GELU()
-        self.bn = nn.BatchNorm1d(self.rank_dim)
-        self.bn2 = nn.BatchNorm1d(self.rank_dim)
-        self.bn3 = nn.BatchNorm1d(self.out_dim) #nn.LayerNorm(self.out_dim)
-        self.k = nn.Linear(x_dim, self.out_dim, bias=False) if self.out_dim != x_dim else nn.Identity()
-        # self.fc = LinearBlock(self.out_dim, self.out_dim, 'bn', 'lrelu')
+        self.act = nn.ReLU(True)
+        self.bn = nn.BatchNorm1d(self.out_dim)
+        self.k = nn.Linear(
+            x_dim, self.out_dim, bias=False) if self.out_dim != x_dim else nn.Identity()
         pass
-    
+
     def forward(self, x, y):
-        
         bs = x.size(0)
         raw_x = x
         x = torch.cat([x, torch.ones(bs, 1, device=x.device)], dim=1)
         y = torch.cat([y, torch.ones(bs, 1, device=y.device)], dim=1)
         x = self.x_fc(x)
-        x = self.bn(x)
         y = self.y_fc(y)
-        y = self.bn2(y)
-        y = self.act(y)
-        
         z = x * y
         z = self.out_fc(z)
-        z = self.bn3(z)
+        z = self.bn(z)
         z = self.act(z)
-        return z
+        return self.k(raw_x) + z
     pass
+
 
 class HiddenDecoder(nn.Module):
     """
@@ -172,6 +134,7 @@ class HiddenDecoder(nn.Module):
     The input image may have various kinds of noise applied to it,
     such as Crop, JpegCompression, and so on. See Noise layers for more.
     """
+
     def __init__(self, msg_len=30, hidden_channels=128, blocks=4, repeat=3):
 
         super(HiddenDecoder, self).__init__()
@@ -179,13 +142,13 @@ class HiddenDecoder(nn.Module):
 
         layers = [ConvBNRelu(3, self.channels)]
         for _ in range(blocks - 1):
-            layers.append(nn.Sequential(
-                ConvBNRelu(self.channels, self.channels),
-                FourierUnit(self.channels, self.channels),
-                Conv2dBlock(self.channels, self.channels, 3, 2, norm='bn', activation='relu')
-                ))
+            layers.append(ConvBNRelu(self.channels, self.channels))
+            layers.append(
+                nn.Sequential(
+                    # FourierUnit(self.channels, self.channels),
+                    SEBlock(self.channels),
+                    Conv2dBlock(self.channels, self.channels, 4, 2, 0, norm='bn', activation='relu')))
 
-        layers.append(nn.Dropout(0.1))
         # layers.append(block_builder(self.channels, config.message_length))
         layers.append(ConvBNRelu(self.channels, msg_len * repeat))
 
@@ -202,9 +165,10 @@ class HiddenDecoder(nn.Module):
         x = self.linear(x)
         return x
 
+
 class FeatureGrid(nn.Module):
     """Learnable feature grid with multi-resolution levels.
-    
+
     Args:
         img_size: Base image size
         feat_dim: Feature dimension per level
@@ -212,85 +176,67 @@ class FeatureGrid(nn.Module):
         init_mode: Weight initialization mode
         sample_mode: Feature sampling mode
     """
-    def __init__(self, 
-                 img_size: int, 
-                 feat_dim: int = 16, 
-                 level: int = 8, 
+
+    def __init__(self,
+                 img_size: int,
+                 feat_dim: int = 16,
+                 level: int = 8,
                  init_mode: str = 'none',
                  sample_mode: str = 'bilinear',
-                 out_dim: int = 128,
-                 addition_fourier_feat=True,
-                 fourier_feat_dim=16,
-                 fourier_feat_tunable=True
-                 ):
+                 out_dim: int = 128):
         super().__init__()
         self.sample_mode = sample_mode
-        
+
         # Create multi-resolution grids
         self.grids = nn.ParameterList([
-            nn.Parameter(math.sqrt(img_size) * torch.randn(1, feat_dim, img_size // 2**i, img_size // 2**i))
+            nn.Parameter(torch.randn(
+                1, feat_dim, img_size // 2**i, img_size // 2**i))
             for i in range(level)
         ])
 
-        
-        hidden_dim = feat_dim * level + fourier_feat_dim if addition_fourier_feat else 0
-        
-        self.out_layer = nn.Sequential(
-            nn.Linear(hidden_dim, out_dim),
-            nn.BatchNorm1d(out_dim),
-            # nn.LeakyReLU(0.2, True),
-            nn.GELU(),
-            # nn.Linear(out_dim * 2, out_dim),
-        )
-
-
-        self.addition_fourier_feat = addition_fourier_feat
-        if addition_fourier_feat:
-            self.fourier_mapper = FourierFeatMapping(
-                2,  
-                map_size=fourier_feat_dim, 
-                tunable=fourier_feat_tunable)
+        self.out = nn.Sequential(
+            nn.Linear(feat_dim * level, out_dim),
+            # nn.LayerNorm(out_dim),
+            nn.SiLU(),
+        ) if out_dim is not None else nn.Identity()
         # Initialize weights
         if init_mode == 'sine':
             for grid in self.grids:
                 num_input = grid.data.size(-1)
-                grid.data.uniform_(-np.sqrt(6 / num_input) / 30, np.sqrt(6 / num_input) / 30)
+                grid.data.uniform_(-np.sqrt(6 / num_input) /
+                                   30, np.sqrt(6 / num_input) / 30)
 
     def forward(self, coords: torch.Tensor) -> torch.Tensor:
         """Sample features from multi-resolution grids.
-        
+
         Args:
             coords: Input coordinates [B, H, W, 2]
-            
+
         Returns:
             Concatenated features from all levels
         """
         batch_size, height, width, _ = coords.shape
-        
+
         feats = []
         for grid in self.grids:
             # Expand grid to batch size and sample features
             grid = grid.expand(batch_size, -1, -1, -1)
-            feat = F.grid_sample(grid, coords.flip(-1), 
-                               align_corners=True, mode=self.sample_mode)
-            feat = rearrange(feat, 'b c h w -> (b h w) c')
+            feat = F.grid_sample(grid, coords.flip(-1),
+                                 align_corners=True, mode=self.sample_mode)
+            feat = rearrange(feat, 'b c h w -> b (h w) c')
             feats.append(feat)
-            
-        if self.addition_fourier_feat:
-                fourier_feat = self.fourier_mapper(coords).permute(0, 3, 1, 2)
-                fourier_feat = rearrange(fourier_feat, 'b c h w -> (b h w) c')
-                feats.append(fourier_feat)
-                pass
         feats = torch.cat(feats, dim=-1)
-        feats = self.out_layer(feats)
+        feats = self.out(feats)
         return feats
+
 
 class INRMark(EngineModel):
     """INR-based Image Watermarking Model.
-    
+
     Args:
         args: Configuration parameters
     """
+
     def __init__(self, args: Args):
         super().__init__(args)
         # global parameters
@@ -302,14 +248,14 @@ class INRMark(EngineModel):
         self.level_dim = 32
         self.level_num = 8
         self.msg_dim = 128
-        self.rank_dim = 64
+        self.rank_dim = args.msg_len
         self.alpha = args.alpha
         # Loss weights
         self.w_msg = args.w_msg
         self.w_img = args.w_img
         self.w_lpips = args.w_lpips
-        self.struct_dim = 128
-        
+        self.struct_dim = 256
+
         # Components
         self.struct_embedding = FeatureGrid(
             img_size=self.img_size*2,
@@ -317,45 +263,29 @@ class INRMark(EngineModel):
             level=self.level_num,
             sample_mode='bilinear',
             out_dim=self.struct_dim)
-        
+
         # Message transformation layers
         # self.S = nn.Linear(self.struct_dim, self.msg_len)
         # self.D = nn.Linear(self.msg_len, self.struct_dim)
-        
+
         # Networks
         self.msg_encoder = MLP(
             in_dim=self.msg_len,
             out_dim=self.msg_dim,
-            # hidden_dim=256,
             num_hidden_layers=2,
             norm='bn'
         )
-        
-        # self.msg_encoder = nn.Sequential(
-        #     nn.Linear(self.msg_len, self.msg_dim),
-        #     nn.GELU(),
-        #     nn.Linear(self.msg_dim, self.msg_dim),
-        #     nn.GELU(),
-        #     nn.Linear(self.msg_dim, self.msg_dim),
-        #     nn.GELU(),
-        # )
-        
+
         self.inr = nn.ModuleList([
             LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
             LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
             LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
-            LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
-            
-            LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
-            LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
-            # LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim),
-            # LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim)
+            LowRankFusionBlock(self.struct_dim, self.msg_dim, self.rank_dim)
         ])
         self.predict = nn.Linear(self.struct_dim, 3)
-            
-        
-        self.decoderD = HiddenDecoder(self.msg_len)
-        
+
+        self.decoder = HiddenDecoder(self.msg_len)
+
         # self.inr = MLP(
         #     in_dim=self.struct_dim,
         #     out_dim=3,
@@ -364,9 +294,7 @@ class INRMark(EngineModel):
         #     norm='bn',
         #     act='relu'
         # )
-        
-        # self.inr.apply(weights_init("xavier"))
-        
+
         # Augmentation
         self.noiser = Noiser([
             ("Identity", None),
@@ -379,29 +307,29 @@ class INRMark(EngineModel):
             ("Cropout", None),
 
             ("Color", None),
-            ("KorniaJpeg", {"min_q": 50, "max_q": 60}),
+            ("KorniaJpeg", None),
             ("GaussianFilter", None),
             ("GaussianNoise", None),
 
         ])
-        
-        # Metrics
-        # self.lpips = REC_LPIPS()
-        # self.lpips = LPIPS(net='vgg')
-    def decode_msg(self, x):
-        return self.decoderD(x)
 
-    def render_img(self, 
-                  coords: torch.Tensor,
-                  msg: torch.Tensor, 
-                  img: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Metrics
+        # self.lpips = LPIPS(net='vgg')
+
+    def decode_msg(self, x):
+        return self.decoder(x)
+    
+    def render_img(self,
+                   coords: torch.Tensor,
+                   msg: torch.Tensor,
+                   img: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Render watermarked image.
-        
+
         Args:
             coords: Coordinate grid [B, H, W, 2]
             msg: Secret message [B, msg_len]
             img: Original image [B, 3, H, W]
-            
+
         Returns:
             wm_img: Watermarked image
             mask: Watermark mask
@@ -409,43 +337,43 @@ class INRMark(EngineModel):
         bs, h, w, c = coords.size()
         n = h * w
         # Sample structural features
-        struct_feat = self.struct_embedding(coords) # [(b n) c]
-        # struct_feat = rearrange(struct_feat, "b n c -> (b n) c")
+        struct_feat = self.struct_embedding(coords)  # [b n c]
+        struct_feat = rearrange(struct_feat, "b n c -> (b n) c")
 
         # Message transformation
-        msg_feat = self.msg_encoder(msg*2-1)
-        msg_feat = msg_feat.unsqueeze(1).repeat(1, n, 1) # [b n c]
+        msg_feat = self.msg_encoder(msg)
+        msg_feat = msg_feat.unsqueeze(1).repeat(1, n, 1)  # [b n c]
         msg_feat = rearrange(msg_feat, "b n c -> (b n) c")
         for layer in self.inr:
-            struct_feat = struct_feat + layer(struct_feat, msg_feat)
+            struct_feat = layer(struct_feat, msg_feat)
             pass
         # Generate watermark mask
         residual = self.predict(struct_feat)
         residual = rearrange(residual, "(b n) c -> b n c", b=bs, n=n)
         residual = rearrange(residual, "b (h w) c -> b c h w", h=h, w=w)
         residual = torch.clamp(residual, -1, 1)
-        
+
         # Apply watermark
         wm_img = residual * self.alpha + img  # Adjust alpha as needed
         return torch.clamp(wm_img, 0, 1), residual
 
-    def forward(self, 
-               coords: torch.Tensor,
-               msg: torch.Tensor,
-               img: torch.Tensor) -> dict:
+    def forward(self,
+                coords: torch.Tensor,
+                msg: torch.Tensor,
+                img: torch.Tensor) -> dict:
         # Generate watermarked image
         wm_img, mask = self.render_img(coords, msg, img)
-        
+
         # Apply PSNR constraint
         if self.fixed_psnr:
             wm_img = clip_psnr(wm_img, img, psnr=self.fixed_psnr)
-            
+
         # Apply augmentations
         noised_img = self.noiser(wm_img, img)[0] if self.noised else wm_img
-        
+
         # Decode message
-        pred_msg = self.decode_msg(noised_img)
-        
+        pred_msg = self.decoder(noised_img)
+
         return {
             "img": img,
             "predict_msg": pred_msg,
@@ -469,24 +397,22 @@ class INRMark(EngineModel):
         predict_msg = res['predict_msg']
         noised_img = res['noised_img']
         msg_loss = F.mse_loss(predict_msg, msg) * self.w_msg
-        
-        img_loss = F.mse_loss(wm_img, cover_img) * self.w_img 
-        # lpips_loss = self.lpips(wm_img*2-1,cover_img*2-1) * self.w_lpips
+
+        img_loss = F.mse_loss(wm_img, cover_img) * self.w_img
         # lpips_loss = self.w_lpips * torch.mean(self.lpips.forward(wm_img*2-1,cover_img*2-1))
 
-
-        loss = msg_loss + img_loss # + lpips_loss
+        loss = msg_loss + img_loss  # + lpips_loss
         self.loss_backward(loss)
         optimizer.step()
 
         acc = msg_acc(predict_msg, msg)
         psnr = PSNR(wm_img, cover_img)
-        
+
         self.log('psnr', psnr.cpu().item(), prog_bar=True)
         self.log('metric/img_loss', img_loss.cpu().item())
         self.log('metric/msg_loss', msg_loss.cpu().item())
         # self.log('metric/lpips_loss', lpips_loss.cpu().item())
-                        
+
         self.log('loss', loss.cpu().item(), prog_bar=True)
         self.log('acc', acc.cpu().item(), prog_bar=True)
 
@@ -496,7 +422,6 @@ class INRMark(EngineModel):
             self.log_img("mask", res['mask'].detach().cpu(), n_epoch=1)
             self.log_img("noised_img", noised_img.detach().cpu(), n_epoch=1)
         pass
-    
 
     def custom_valid_step(self, batch, batch_idx):
         self.eval()
@@ -507,60 +432,58 @@ class INRMark(EngineModel):
         res = self(coords, msg, cover_img)
         wm_img = res['wm_img']
         predict_msg = res['predict_msg']
-        
+
         msg_loss = F.mse_loss(predict_msg, msg) * self.w_msg
-        img_loss = F.mse_loss(wm_img, cover_img) * self.w_img    
-        # lpips_loss = self.lpips(wm_img*2-1,cover_img*2-1) * self.w_lpips
+        img_loss = F.mse_loss(wm_img, cover_img) * self.w_img
         # lpips_loss = self.w_lpips * torch.mean(self.lpips.forward(wm_img*2-1,cover_img*2-1))
 
-        loss = msg_loss + img_loss # + lpips_loss
+        loss = msg_loss + img_loss  # + lpips_loss
         acc = msg_acc(predict_msg, msg)
         psnr = PSNR(wm_img, cover_img)
-        
+
         self.log("metric_val/psnr", psnr.cpu().item(), sync_dist=True)
         self.log('val_loss', loss.cpu().item(), sync_dist=True)
         self.log('metric_val/val_acc', acc.cpu().item(), sync_dist=True)
         pass
 
     def build_optimizers(self, args):
-        return torch.optim.Adam(self.parameters(), lr=8e-4)
+        return torch.optim.AdamW(self.parameters(), lr=4e-4)
         pass
-    
-    
+
 
 class INRMarkTrainer(EngineTrainer):
 
     def build_dataset(self, cfg):
-        return MyDataset(cfg, data_len=20000), MyDataset(cfg, data_len=1000)
-    
-    
+        return MyDataset(cfg, data_len=50000), MyDataset(cfg, data_len=100)
+
     def build_model(self, cfg):
         return INRMark(cfg)
 
     def build_checkpoint_callback(self):
-        
+
         callback = ModelCheckpoint(
-            save_top_k= 5, # 默认保存最好的5个， 需要保存条件
-            monitor='val_loss', # 默认使用总loss保存最好的结果
+            save_top_k=5,  # 默认保存最好的5个， 需要保存条件
+            monitor='val_loss',  # 默认使用总loss保存最好的结果
             filename="ckpt-{epoch:02d}-{val_loss:.4f}",
             save_last=True,
-            every_n_epochs=5,
+            every_n_epochs=1,
             # save_on_train_epoch_end=True,
             save_weights_only=False
         )
-        
+
         return callback
-    
+
     pass
-   
+
+
 if __name__ == '__main__':
     args = Args().load("/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/main.yaml")
-    
+
     model = INRMark(args)
     img_size = 128
     msg_len = 30
     model(
-        torch.clamp(torch.rand(2, img_size, img_size, 2), -1, 1), 
-        torch.rand(2, msg_len), 
+        torch.clamp(torch.rand(2, img_size, img_size, 2), -1, 1),
+        torch.rand(2, msg_len),
         torch.clamp(torch.randn(2, 3, img_size, img_size), 0, 1))
     pass

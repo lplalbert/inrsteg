@@ -7,7 +7,6 @@ from FastTools.steganography.utils.common import gen_random_msg, msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
 from dataset.Mydataset import MyDataset, generate_grid_coordinates
-from model.ismark_v4 import INRMark
 import os
 from torchvision import transforms, utils
 import torch
@@ -15,19 +14,22 @@ import numpy as np
 import torch.nn.functional as F
 import random
 
+
 # 在不同尺度上进行渲染
 
-cfg_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/v4.yaml"
-ckpt_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/ismark_v4_alpha_0.04_min_scale_0.02_pnsr_36/lightning_logs/version_2/checkpoints/ckpt-epoch=239-val_loss=0.0055.ckpt"
+from model.ismark_v6_level_none import INRMark
+cfg_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/v6_level_none.yaml"
+ckpt_path = "/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/output/v6_level_none/lightning_logs/version_2/checkpoints/ckpt-epoch=1089-val_loss=0.0290.ckpt"
 
-device = "cuda:1"
+
+device = "cuda:0"
 args = Args().load(cfg_path)
 model = INRMark.load_from_checkpoint(ckpt_path, args=args).to(device).eval()
 
 data_path = "/home/light_sun/workspace/inrsteg/data/DIV2K_valid"
 imgs = os.listdir(data_path)
-fixed_psnr = 36
-img_size = 128
+fixed_psnr = 35
+img_size = 512
 ts = transforms.Compose([
     transforms.ToTensor(),
     transforms.Resize((img_size, img_size))
@@ -174,6 +176,7 @@ noiser = Noiser(
 
 
 if __name__ == "__main__":
+    gen_mark("./mark.png")
     noiser = Noiser(
         [
             # ("Identity", None),
@@ -201,8 +204,8 @@ if __name__ == "__main__":
         pass
     # gen_mark("./mark.png")
     # 清空文件夹
-    path = "./output_imgs_128"
-    os.system("rm -rf {}/*".format(path))
-    gen_imgs(path)
-    valid(path, noise_fn)
+    # path = "./output_imgs_128"
+    # os.system("rm -rf {}/*".format(path))
+    # gen_imgs(path)
+    # valid(path, noise_fn)
     pass

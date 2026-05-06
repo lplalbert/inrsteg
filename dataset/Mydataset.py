@@ -13,6 +13,8 @@ from FastTools.util.utils import vutils
 import numpy as np
 import torch.nn.functional as F
 
+IMG_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
+
 def gen_start_coords(min_scale=0):
     min_scale *= 2
     width = np.random.uniform(min_scale, 2)
@@ -50,10 +52,16 @@ class MyDataset(LDataset):
         self.use_global = args.use_global
         self.use_cell = args.use_cell
         if valid:
-            self.data_path = "/home/light_sun/workspace/inrsteg/data/DIV2K_valid"
+            self.data_path = args.valid_data_path or "/home/light_sun/workspace/inrsteg/data/DIV2K_valid"
         else:
-            self.data_path = "/home/light_sun/workspace/inrsteg/data/DIV2K_train"
-        self.files = os.listdir(self.data_path)
+            self.data_path = args.train_data_path or "/home/light_sun/workspace/inrsteg/data/DIV2K_train"
+        self.files = [
+            name for name in os.listdir(self.data_path)
+            if name.lower().endswith(IMG_EXTENSIONS)
+        ]
+        self.files.sort()
+        if not self.files:
+            raise FileNotFoundError("No image files found in dataset path: {}".format(self.data_path))
         self.cache = args.cache     
         self.global_ts = transforms.Compose([
             transforms.ToTensor(),
