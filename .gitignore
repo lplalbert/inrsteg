@@ -52,4 +52,5 @@ output1/
 
 # Env
 condaenv.*
-environment.ymlVerifyWmExactor/
+environment.yml
+VerifyWmExactor/
