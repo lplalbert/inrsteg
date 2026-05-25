@@ -1,7 +1,9 @@
-# Standard library imports
+# V7: 真正均匀坐标采样版本
+# 核心改动: 使用 Mydataset_v7 (gen_start_coords_uniform)
+# 每个坐标点被训练窗口覆盖的概率严格相等, 消除中心-边缘训练不平衡
+
 from typing import Optional, Tuple
 
-# Third-party imports
 import lpips
 import numpy as np
 import torch
@@ -11,11 +13,6 @@ from einops import rearrange
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity as LPIPS
 
-# Local imports
-import FastTools.steganography.Noiser.Module.WeChatHF       # noqa: F401
-import FastTools.steganography.Noiser.Module.ScreenShooting  # noqa: F401
-from FastTools.steganography.Noiser.Module.WeChatHF import WeChatHFZeroLayer
-from FastTools.steganography.Noiser.Module.ScreenShooting import ScreenShootingLayer
 from FastTools.light.Engine import EngineModel, EngineTrainer
 from FastTools.light.LightModel import LModel
 from FastTools.metre import PSNR
@@ -24,13 +21,7 @@ from FastTools.steganography.Noiser.Noiser import Noiser
 from FastTools.steganography.utils.common import msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
-from dataset.Mydataset import MyDataset, generate_grid_coordinates
-
-def get_cfg_value(args: Args, key: str, default=None):
-    value = getattr(args, key)
-    return default if value is None else value
-
-# 采用v4的权重，去掉没用的傅里叶卷积, 添加坐标映射, 激活函数变成GeLu
+from dataset.Mydataset_v7 import MyDatasetV7, generate_grid_coordinates
 class FourierFeatMapping(nn.Module):
     # 基于理论Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains
     def __init__(self, in_dim, map_scale=16, map_size=4, tunable=False):
@@ -232,6 +223,7 @@ class FeatureGrid(nn.Module):
 
         self.out = nn.Sequential(
             nn.Linear(feat_dim * level, out_dim),
+            # nn.LayerNorm(out_dim),
             nn.BatchNorm1d(out_dim),
             nn.SiLU(),
         ) if out_dim is not None else nn.Identity()
@@ -305,26 +297,21 @@ class INRMark(EngineModel):
         super().__init__(args)
         # global parameters
         self.noised = args.noised
-        self.use_wechat_screen = get_cfg_value(args, 'use_wechat_screen', True)
         self.fixed_psnr = args.fixed_psnr
         # Architecture parameters
         self.img_size = args.img_size
         self.msg_len = args.msg_len
-        self.level_dim = int(get_cfg_value(args, "coord_map_dim", 32))
-        self.level_num = int(get_cfg_value(args, "coord_map_levels", 8))
-        self.msg_dim = int(get_cfg_value(args, "hidden_dim", 128))
+        self.level_dim = 32
+        self.level_num = 8
+        self.msg_dim = 128
         self.rank_dim = args.msg_len
         self.alpha = args.alpha
         # Loss weights
         self.w_msg = args.w_msg
         self.w_img = args.w_img
         self.w_lpips = args.w_lpips
-        self.struct_dim = int(get_cfg_value(args, "feat_dim", 256))
+        self.struct_dim = 256
         self.decoder_mask_len = int(args.decoder_mask_len or self.msg_len)
-        self.noise_crop_min_ratio = float(get_cfg_value(args, "noise_crop_min_ratio", 0.5))
-        self.noise_crop_max_ratio = float(get_cfg_value(args, "noise_crop_max_ratio", 1.0))
-        self.noise_crop_min_ratio = float(np.clip(self.noise_crop_min_ratio, 1e-6, 1.0))
-        self.noise_crop_max_ratio = float(np.clip(self.noise_crop_max_ratio, self.noise_crop_min_ratio, 1.0))
         
 
         # Components
@@ -357,7 +344,7 @@ class INRMark(EngineModel):
 
         self.decoder = HiddenDecoder(
             self.msg_len,
-            blocks=getattr(args, 'decoder_blocks', 2),
+            blocks=getattr(args, 'decoder_blocks', 4),
         )
 
         # self.inr = MLP(
@@ -372,48 +359,27 @@ class INRMark(EngineModel):
         # Augmentation
         self.noiser = Noiser([
             ("Identity", None),
+            ("Rotate", None),
+            ("Crop", None),
+            ("Translate", None),
+            ("Scale", None),
+            ("Shear", None),
+            ("Dropout", None),
+            ("Cropout", None),
+
+            ("Color", None),
+            ("KorniaJpeg", None),
+            ("GaussianFilter", None),
+            ("GaussianNoise", None),
+
         ])
-
-        # 每次必过的噪声层（不参与随机选择）
-        self.wechat_noise = WeChatHFZeroLayer(
-            zigzag_keep=21, canvas_h=3072, canvas_w=4096, crop_size=256)
-        self.screen_noise = ScreenShootingLayer(
-            perspective_d=8, moire_weight=0.15, light_weight=0.85, gauss_std=0.0316)
-
-        # ---- 从预训练权重加载 ----
-        pretrained_path = getattr(args, 'pretrained_ckpt', None)
-        if pretrained_path:
-            self._load_pretrained(pretrained_path)
 
         # Metrics
         # self.lpips = LPIPS(net='vgg')
 
     def decode_msg(self, x):
         return self.decoder(x)
-
-    def _load_pretrained(self, ckpt_path: str):
-        """加载预训练权重，跳过 shape 不匹配的层。"""
-        import os
-        if not os.path.exists(ckpt_path):
-            print(f"WARNING: pretrained ckpt not found: {ckpt_path}")
-            return
-
-        state = torch.load(ckpt_path, map_location='cpu')
-        if 'state_dict' in state:
-            state = state['state_dict']
-
-        model_state = self.state_dict()
-        matched, skipped = 0, 0
-        for k, v in state.items():
-            if k in model_state and v.shape == model_state[k].shape:
-                model_state[k] = v
-                matched += 1
-            else:
-                skipped += 1
-
-        self.load_state_dict(model_state, strict=False)
-        print(f"Pretrained loaded: {matched} matched, {skipped} skipped from {ckpt_path}")
-
+    
     def render_img(self,
                    coords: torch.Tensor,
                    msg: torch.Tensor,
@@ -462,17 +428,11 @@ class INRMark(EngineModel):
         # Generate watermarked image
         wm_img, mask = self.render_img(coords, msg, img)
 
-        # Apply PSNR constraint（干净水印图，用于 img_loss）
+        # Apply PSNR constraint
         if self.fixed_psnr:
             wm_img = clip_psnr(wm_img, img, psnr=self.fixed_psnr)
-        clean_wm = wm_img  # 保存用于图像质量损失
 
-        # 每次必过的噪声（先屏摄再微信压缩），可通过 use_wechat_screen 开关
-        if self.noised and getattr(self, 'use_wechat_screen', True):
-            wm_img, _ = self.screen_noise.noise(wm_img, img)
-            wm_img, _ = self.wechat_noise.noise(wm_img, img)
-
-        # 原 Noiser 随机噪声
+        # Apply augmentations
         noised_img = self.noiser(wm_img, img)[0] if self.noised else wm_img
 
         # Decode message
@@ -481,8 +441,8 @@ class INRMark(EngineModel):
         return {
             "img": img,
             "predict_msg": pred_msg,
-            "wm_img": clean_wm,                # 干净水印图 → img_loss + 判别器
-            "noised_img": noised_img,           # 全噪声图 → decoder
+            "wm_img": wm_img,
+            "noised_img": noised_img,
             "mask": mask
         }
 
@@ -529,10 +489,7 @@ class INRMark(EngineModel):
         self.log('loss', loss.cpu().item(), prog_bar=True)
         self.log('acc', acc.cpu().item(), prog_bar=True)
         self.log('msg_len', self.decoder_mask_len, prog_bar=True)
-
-        if batch_idx % 50 == 0:
-            print(f'[step {batch_idx}] acc={acc.cpu().item():.4f}  loss={loss.cpu().item():.4f}  msg_loss={msg_loss.cpu().item():.4f}  psnr={psnr.cpu().item():.1f}', flush=True)
-
+        
         # if acc >= 0.9:
         #     self.decoder_mask_len += 1
         #     self.decoder_mask_len = min(self.decoder_mask_len, self.msg_len)
@@ -579,7 +536,7 @@ class INRMark(EngineModel):
 class INRMarkTrainer(EngineTrainer):
 
     def build_dataset(self, cfg):
-        return MyDataset(cfg, data_len=50000), MyDataset(cfg, data_len=100, valid=True)
+        return MyDatasetV7(cfg, data_len=50000), MyDatasetV7(cfg, data_len=100, valid=True)
 
     def build_model(self, cfg):
         return INRMark(cfg)
@@ -605,8 +562,8 @@ if __name__ == '__main__':
     args = Args().load("/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/main.yaml")
 
     model = INRMark(args)
-    img_size = 256
-    msg_len = 64
+    img_size = 128 
+    msg_len = 30
     model(
         torch.clamp(torch.rand(2, img_size, img_size, 2), -1, 1),
         torch.rand(2, msg_len),

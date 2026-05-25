@@ -13,9 +13,8 @@ from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity as LPI
 
 # Local imports
 import FastTools.steganography.Noiser.Module.WeChatHF       # noqa: F401
+import FastTools.steganography.Noiser.Module.WeChatHF       # noqa: F401
 import FastTools.steganography.Noiser.Module.ScreenShooting  # noqa: F401
-from FastTools.steganography.Noiser.Module.WeChatHF import WeChatHFZeroLayer
-from FastTools.steganography.Noiser.Module.ScreenShooting import ScreenShootingLayer
 from FastTools.light.Engine import EngineModel, EngineTrainer
 from FastTools.light.LightModel import LModel
 from FastTools.metre import PSNR
@@ -305,13 +304,12 @@ class INRMark(EngineModel):
         super().__init__(args)
         # global parameters
         self.noised = args.noised
-        self.use_wechat_screen = get_cfg_value(args, 'use_wechat_screen', True)
         self.fixed_psnr = args.fixed_psnr
         # Architecture parameters
         self.img_size = args.img_size
         self.msg_len = args.msg_len
         self.level_dim = int(get_cfg_value(args, "coord_map_dim", 32))
-        self.level_num = int(get_cfg_value(args, "coord_map_levels", 8))
+        self.level_num = int(get_cfg_value(args, "coord_map_levels", 4))  # v8: INR 4层
         self.msg_dim = int(get_cfg_value(args, "hidden_dim", 128))
         self.rank_dim = args.msg_len
         self.alpha = args.alpha
@@ -329,7 +327,7 @@ class INRMark(EngineModel):
 
         # Components
         self.struct_embedding = FeatureGrid(
-            img_size=self.img_size*2,
+            img_size=self.img_size // 2,    # 128 → grids: 128, 64, 32, 16
             feat_dim=self.level_dim,
             level=self.level_num,
             sample_mode='bilinear',
@@ -372,13 +370,22 @@ class INRMark(EngineModel):
         # Augmentation
         self.noiser = Noiser([
             ("Identity", None),
-        ])
+            ("Rotate", None),
+            ("Crop", {"ratio": [self.noise_crop_min_ratio, self.noise_crop_max_ratio]}),
+            ("Translate", None),
+            ("Scale", None),
+            ("Shear", None),
+            ("Dropout", None),
+            ("Cropout", None),
 
-        # 每次必过的噪声层（不参与随机选择）
-        self.wechat_noise = WeChatHFZeroLayer(
-            zigzag_keep=21, canvas_h=3072, canvas_w=4096, crop_size=256)
-        self.screen_noise = ScreenShootingLayer(
-            perspective_d=8, moire_weight=0.15, light_weight=0.85, gauss_std=0.0316)
+            ("Color", None),
+            ("KorniaJpeg", None),
+            ("GaussianFilter", None),
+            ("GaussianNoise", None),
+            ("WeChatHFZero", {"zigzag_keep": 21, "canvas_h": 3072, "canvas_w": 4096, "crop_size": 256}),
+            ("ScreenShooting", {"perspective_d": 8, "moire_weight": 0.15, "light_weight": 0.85, "gauss_std": 0.0316}),
+
+        ])
 
         # ---- 从预训练权重加载 ----
         pretrained_path = getattr(args, 'pretrained_ckpt', None)
@@ -462,17 +469,11 @@ class INRMark(EngineModel):
         # Generate watermarked image
         wm_img, mask = self.render_img(coords, msg, img)
 
-        # Apply PSNR constraint（干净水印图，用于 img_loss）
+        # Apply PSNR constraint
         if self.fixed_psnr:
             wm_img = clip_psnr(wm_img, img, psnr=self.fixed_psnr)
-        clean_wm = wm_img  # 保存用于图像质量损失
 
-        # 每次必过的噪声（先屏摄再微信压缩），可通过 use_wechat_screen 开关
-        if self.noised and getattr(self, 'use_wechat_screen', True):
-            wm_img, _ = self.screen_noise.noise(wm_img, img)
-            wm_img, _ = self.wechat_noise.noise(wm_img, img)
-
-        # 原 Noiser 随机噪声
+        # Apply augmentations
         noised_img = self.noiser(wm_img, img)[0] if self.noised else wm_img
 
         # Decode message
@@ -481,8 +482,8 @@ class INRMark(EngineModel):
         return {
             "img": img,
             "predict_msg": pred_msg,
-            "wm_img": clean_wm,                # 干净水印图 → img_loss + 判别器
-            "noised_img": noised_img,           # 全噪声图 → decoder
+            "wm_img": wm_img,
+            "noised_img": noised_img,
             "mask": mask
         }
 
@@ -529,10 +530,7 @@ class INRMark(EngineModel):
         self.log('loss', loss.cpu().item(), prog_bar=True)
         self.log('acc', acc.cpu().item(), prog_bar=True)
         self.log('msg_len', self.decoder_mask_len, prog_bar=True)
-
-        if batch_idx % 50 == 0:
-            print(f'[step {batch_idx}] acc={acc.cpu().item():.4f}  loss={loss.cpu().item():.4f}  msg_loss={msg_loss.cpu().item():.4f}  psnr={psnr.cpu().item():.1f}', flush=True)
-
+        
         # if acc >= 0.9:
         #     self.decoder_mask_len += 1
         #     self.decoder_mask_len = min(self.decoder_mask_len, self.msg_len)

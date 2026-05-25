@@ -179,6 +179,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--patch-size", type=int, default=128, help="Render patch size.")
     parser.add_argument("--overlap", type=int, default=0, help="Render patch overlap.")
     parser.add_argument("--fixed-psnr", type=float, default=None, help="Optional PSNR clipping target.")
+    parser.add_argument("--alpha-scale", type=float, default=1.0, help="Scale watermark template by this factor. Default 1.0.")
     parser.add_argument("--message", default=None, help="Binary message. Defaults to random.")
     parser.add_argument(
         "--per-image-msg",
@@ -321,6 +322,7 @@ def apply_watermark_template(
     img: torch.Tensor,
     watermark_template: torch.Tensor,
     fixed_psnr: float = None,
+    scale: float = 1.0,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     max_size = max(img.size(2), img.size(3))
     watermark = F.interpolate(
@@ -338,7 +340,7 @@ def apply_watermark_template(
     if watermark.shape != img.shape:
         raise ValueError(f"Watermark shape {watermark.shape} != image shape {img.shape}")
 
-    watermarked = torch.clamp(img + watermark, 0, 1)
+    watermarked = torch.clamp(img + watermark * scale, 0, 1)
     if fixed_psnr is not None:
         watermarked = clip_psnr(watermarked, img, fixed_psnr, over_clip=True).clamp(0, 1)
     return watermarked, watermarked - img
@@ -568,6 +570,7 @@ def main() -> None:
             img=clean,
             watermark_template=watermark_template,
             fixed_psnr=cli.fixed_psnr,
+            scale=cli.alpha_scale,
         )
 
         full_psnr = float(psnr(watermarked, clean).item())

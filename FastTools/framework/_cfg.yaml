@@ -1,0 +1,25 @@
+# setting
+name: "Default"
+root_dir: "./output"
+gpus: [0]
+sync_bn: True
+ckpt_path: null
+only_load_model: False
+
+# train
+max_steps: 100000
+
+# dataset
+batch_size: 24
+num_workers: 12
+val_batch_size: 2
+val_num_workers: 2
+pin_memory: True
+
+log_freq: 20
+save_freq: 2000
+valid_freq: 2000
+
+# ddp
+backend: "nccl"
+port: "65565"

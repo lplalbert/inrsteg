@@ -1,0 +1,52 @@
+name: "ismark_v6_finetune_doc"
+root_dir: "/home/lpl2025/lpl/inrsteg-final_v1/output1/dual_noise"
+gpus: [0, 1]
+batch_size: 8
+val_batch_size: 32
+num_workers: 32
+val_num_workers: 8
+max_epochs: 20000
+find_unused_parameters: false
+ckpt_path: "/home/lpl2025/lpl/inrsteg-final_v1/output1/dual_noise/ismark_v6_size256_msg64/lightning_logs/version_3/checkpoints/ckpt-epoch=04-val_loss=0.1313.ckpt"
+resume: false
+lr: 0.00004
+n_val_epoch: 5
+seed: 42
+
+# 混合数据集：document_ds + DIV2K
+train_data_paths:
+  - "/mnt/xsj2023/Datasets/document_ds/document_train"
+  - "/mnt/xsj2023/Datasets/DIV2K/DIV2K_train"
+train_data_lengths:
+  - 5000
+  - 5000
+valid_data_path: "/mnt/xsj2023/Datasets/document_ds/document_val"
+
+img_size: 256
+msg_len: 64
+decoder_mask_len: 64
+decoder_blocks: 4
+feat_dim: 256
+hidden_dim: 128
+coord_map_dim: 32
+target_canvas_size: 2048
+target_crop_size: 256
+min_scale: 0.125
+noise_crop_min_ratio: 0.125
+noise_crop_max_ratio: 1.0
+
+use_bg: true
+use_fold: true
+cache: false
+use_global: false
+use_cell: false
+tunable_decoder: true
+fixed_psnr: 36
+inject_rgb: true
+noised: true
+use_jnd: true
+alpha: 0.02
+
+w_msg: 2
+w_img: 1
+w_lpips: 0.

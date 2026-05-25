@@ -1,0 +1,32 @@
+name: inrmark
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.9
+  - pip
+  - pip:
+    - torch>=2.0
+    - torchvision>=0.15
+    - torchaudio>=2.0
+    - lightning>=2.0
+    - pytorch-lightning>=2.0
+    - torchmetrics>=0.10
+    - tensorboard>=2.10
+    - einops>=0.6
+    - numpy>=1.20
+    - scipy>=1.8
+    - scikit-image>=0.19
+    - pillow>=9.0
+    - pyyaml>=6.0
+    - tqdm>=4.60
+    - omegaconf>=2.0
+    - kornia>=0.5
+    - kornia_rs>=0.1
+    - lpips>=0.1
+    - timm>=0.9
+    - matplotlib>=3.5
+    - psutil>=5.0
+    - packaging>=20.0

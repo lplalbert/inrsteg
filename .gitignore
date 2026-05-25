@@ -1,4 +1,3 @@
-FastTools/
 data/
 .vscode/
 .codex
@@ -34,3 +33,23 @@ liif/
 zl/
 
 api_deploy_inr/
+
+# Test data and results
+test_photo/
+display_test*/
+decode_photo_results*/
+output1/
+
+# Claude
+.claude/
+
+# Papers
+*.pdf
+*.svg
+
+# Logs
+*.log
+
+# Env
+condaenv.*
+environment.ymlVerifyWmExactor/

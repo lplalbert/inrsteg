@@ -12,10 +12,8 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity as LPIPS
 
 # Local imports
-import FastTools.steganography.Noiser.Module.WeChatHF       # noqa: F401
-import FastTools.steganography.Noiser.Module.ScreenShooting  # noqa: F401
-from FastTools.steganography.Noiser.Module.WeChatHF import WeChatHFZeroLayer
-from FastTools.steganography.Noiser.Module.ScreenShooting import ScreenShootingLayer
+import FastTools.steganography.Noiser.Module.WeChatHF       # noqa: F401  register WeChatHFZero
+import FastTools.steganography.Noiser.Module.ScreenShooting  # noqa: F401  register ScreenShooting
 from FastTools.light.Engine import EngineModel, EngineTrainer
 from FastTools.light.LightModel import LModel
 from FastTools.metre import PSNR
@@ -25,10 +23,6 @@ from FastTools.steganography.utils.common import msg_acc
 from FastTools.util.ImgUtil import clip_psnr
 from FastTools.util.TrainUtil import Args
 from dataset.Mydataset import MyDataset, generate_grid_coordinates
-
-def get_cfg_value(args: Args, key: str, default=None):
-    value = getattr(args, key)
-    return default if value is None else value
 
 # 采用v4的权重，去掉没用的傅里叶卷积, 添加坐标映射, 激活函数变成GeLu
 class FourierFeatMapping(nn.Module):
@@ -223,15 +217,17 @@ class FeatureGrid(nn.Module):
         super().__init__()
         self.sample_mode = sample_mode
 
-        # Create multi-resolution grids
+        # Create multi-resolution grids (v8: reduced init scale for smoother convergence)
+        init_scale = 0.01
         self.grids = nn.ParameterList([
             nn.Parameter(torch.randn(
-                1, feat_dim, img_size // 2**i, img_size // 2**i))
+                1, feat_dim, img_size // 2**i, img_size // 2**i) * init_scale)
             for i in range(level)
         ])
 
         self.out = nn.Sequential(
             nn.Linear(feat_dim * level, out_dim),
+            # nn.LayerNorm(out_dim),
             nn.BatchNorm1d(out_dim),
             nn.SiLU(),
         ) if out_dim is not None else nn.Identity()
@@ -305,26 +301,22 @@ class INRMark(EngineModel):
         super().__init__(args)
         # global parameters
         self.noised = args.noised
-        self.use_wechat_screen = get_cfg_value(args, 'use_wechat_screen', True)
         self.fixed_psnr = args.fixed_psnr
         # Architecture parameters
         self.img_size = args.img_size
         self.msg_len = args.msg_len
-        self.level_dim = int(get_cfg_value(args, "coord_map_dim", 32))
-        self.level_num = int(get_cfg_value(args, "coord_map_levels", 8))
-        self.msg_dim = int(get_cfg_value(args, "hidden_dim", 128))
-        self.rank_dim = args.msg_len
+        self.level_dim = 32
+        self.level_num = 4  # v8: 减少网格层级，抑制大块条纹
+        self.msg_dim = 128
+        self.rank_dim = 64  # v8: 加大融合秩，解耦消息长度瓶颈
         self.alpha = args.alpha
         # Loss weights
         self.w_msg = args.w_msg
         self.w_img = args.w_img
         self.w_lpips = args.w_lpips
-        self.struct_dim = int(get_cfg_value(args, "feat_dim", 256))
-        self.decoder_mask_len = int(args.decoder_mask_len or self.msg_len)
-        self.noise_crop_min_ratio = float(get_cfg_value(args, "noise_crop_min_ratio", 0.5))
-        self.noise_crop_max_ratio = float(get_cfg_value(args, "noise_crop_max_ratio", 1.0))
-        self.noise_crop_min_ratio = float(np.clip(self.noise_crop_min_ratio, 1e-6, 1.0))
-        self.noise_crop_max_ratio = float(np.clip(self.noise_crop_max_ratio, self.noise_crop_min_ratio, 1.0))
+        self.w_tv = getattr(args, 'w_tv', 0.01)
+        self.struct_dim = 256
+        self.decoder_mask_len = getattr(args, 'decoder_mask_len', args.msg_len)
         
 
         # Components
@@ -369,42 +361,52 @@ class INRMark(EngineModel):
         #     act='relu'
         # )
 
-        # Augmentation
+        # 直接使用全部噪声层（不分阶段）
         self.noiser = Noiser([
             ("Identity", None),
+            ("Rotate", None),
+            ("Crop", None),
+            ("Translate", None),
+            ("Scale", None),
+            ("Shear", None),
+            ("Dropout", None),
+            ("Cropout", None),
+            ("Color", None),
+            ("KorniaJpeg", None),
+            ("GaussianFilter", None),
+            ("GaussianNoise", None),
+            ("WeChatHFZero", {"zigzag_keep": 21, "canvas_h": 3072, "canvas_w": 4096, "crop_size": 256}),
+            ("ScreenShooting", {"perspective_d": 8, "moire_weight": 0.15, "light_weight": 0.85, "gauss_std": 0.0316}),
         ])
-
-        # 每次必过的噪声层（不参与随机选择）
-        self.wechat_noise = WeChatHFZeroLayer(
-            zigzag_keep=21, canvas_h=3072, canvas_w=4096, crop_size=256)
-        self.screen_noise = ScreenShootingLayer(
-            perspective_d=8, moire_weight=0.15, light_weight=0.85, gauss_std=0.0316)
-
-        # ---- 从预训练权重加载 ----
-        pretrained_path = getattr(args, 'pretrained_ckpt', None)
-        if pretrained_path:
-            self._load_pretrained(pretrained_path)
 
         # Metrics
         # self.lpips = LPIPS(net='vgg')
 
-    def decode_msg(self, x):
-        return self.decoder(x)
+        # ---- 从 v6_size256 预训练权重加载 ----
+        pretrained_path = getattr(args, 'pretrained_ckpt', None)
+        if pretrained_path:
+            self._load_pretrained(pretrained_path)
 
     def _load_pretrained(self, ckpt_path: str):
-        """加载预训练权重，跳过 shape 不匹配的层。"""
+        """加载 v6 预训练权重，跳过 shape 不匹配的层。"""
         import os
         if not os.path.exists(ckpt_path):
-            print(f"WARNING: pretrained ckpt not found: {ckpt_path}")
+            print(f"[v8] WARNING: pretrained ckpt not found: {ckpt_path}")
             return
 
         state = torch.load(ckpt_path, map_location='cpu')
         if 'state_dict' in state:
             state = state['state_dict']
 
+        # Key remapping: pretrained v6 uses 'norm' for BN in LowRankFusionBlock, v8 uses 'bn'
+        remapped = {}
+        for k, v in state.items():
+            new_k = k.replace('.norm.', '.bn.') if 'inr.' in k and '.norm.' in k else k
+            remapped[new_k] = v
+
         model_state = self.state_dict()
         matched, skipped = 0, 0
-        for k, v in state.items():
+        for k, v in remapped.items():
             if k in model_state and v.shape == model_state[k].shape:
                 model_state[k] = v
                 matched += 1
@@ -412,8 +414,11 @@ class INRMark(EngineModel):
                 skipped += 1
 
         self.load_state_dict(model_state, strict=False)
-        print(f"Pretrained loaded: {matched} matched, {skipped} skipped from {ckpt_path}")
+        print(f"[v8] Pretrained loaded: {matched} matched, {skipped} skipped from {ckpt_path}")
 
+    def decode_msg(self, x):
+        return self.decoder(x)
+    
     def render_img(self,
                    coords: torch.Tensor,
                    msg: torch.Tensor,
@@ -462,17 +467,11 @@ class INRMark(EngineModel):
         # Generate watermarked image
         wm_img, mask = self.render_img(coords, msg, img)
 
-        # Apply PSNR constraint（干净水印图，用于 img_loss）
+        # Apply PSNR constraint
         if self.fixed_psnr:
             wm_img = clip_psnr(wm_img, img, psnr=self.fixed_psnr)
-        clean_wm = wm_img  # 保存用于图像质量损失
 
-        # 每次必过的噪声（先屏摄再微信压缩），可通过 use_wechat_screen 开关
-        if self.noised and getattr(self, 'use_wechat_screen', True):
-            wm_img, _ = self.screen_noise.noise(wm_img, img)
-            wm_img, _ = self.wechat_noise.noise(wm_img, img)
-
-        # 原 Noiser 随机噪声
+        # Apply augmentations
         noised_img = self.noiser(wm_img, img)[0] if self.noised else wm_img
 
         # Decode message
@@ -481,68 +480,62 @@ class INRMark(EngineModel):
         return {
             "img": img,
             "predict_msg": pred_msg,
-            "wm_img": clean_wm,                # 干净水印图 → img_loss + 判别器
-            "noised_img": noised_img,           # 全噪声图 → decoder
+            "wm_img": wm_img,
+            "noised_img": noised_img,
             "mask": mask
         }
 
+    def tv_loss(self):
+        """Grid Total Variation: penalize large differences between adjacent grid points."""
+        tv = 0.0
+        for grid in self.struct_embedding.grids:
+            # grid: [1, C, H, W]
+            dh = (grid[:, :, 1:, :] - grid[:, :, :-1, :]).abs().mean()
+            dw = (grid[:, :, :, 1:] - grid[:, :, :, :-1]).abs().mean()
+            tv += dh + dw
+        return tv / len(self.struct_embedding.grids)
+
     def custom_train_step(self, batch, optimizers, schedulers, batch_idx):
         self.train()
-        # self.decoder[1].eval()
-        optimizer: torch.optim.Adam = optimizers
-        optimizer.zero_grad()
+        optimizer = optimizers
         coords = batch['coords']
         msg = batch['msg']
         cover_img = batch['img']
 
+        optimizer.zero_grad()
+
+        # ---- Forward ----
         res = self(coords, msg, cover_img)
-
         wm_img = res['wm_img']
-        predict_msg = res['predict_msg']
-        
-        # 采用mask，只看前n位
-        predict_msg = predict_msg[:, :self.decoder_mask_len]
-        msg = msg[:, :self.decoder_mask_len]
-        
-        
-        
+        predict_msg = res['predict_msg'][:, :self.decoder_mask_len]
+        msg_trunc = msg[:, :self.decoder_mask_len]
         noised_img = res['noised_img']
-        msg_loss = F.mse_loss(predict_msg, msg) * self.w_msg
 
+        # ---- Losses ----
+        msg_loss = F.mse_loss(predict_msg, msg_trunc) * self.w_msg
         img_loss = F.mse_loss(wm_img, cover_img) * self.w_img
-        # lpips_loss = self.w_lpips * torch.mean(self.lpips.forward(wm_img*2-1,cover_img*2-1))
+        tv = self.tv_loss() * self.w_tv
+        loss = msg_loss + img_loss + tv
 
-        loss = msg_loss + img_loss  # + lpips_loss
         self.loss_backward(loss)
         optimizer.step()
 
-        acc = msg_acc(predict_msg, msg)
+        acc = msg_acc(predict_msg, msg_trunc)
         psnr = PSNR(wm_img, cover_img)
-        
-        
 
         self.log('psnr', psnr.cpu().item(), prog_bar=True)
         self.log('metric/img_loss', img_loss.cpu().item())
         self.log('metric/msg_loss', msg_loss.cpu().item())
-        # self.log('metric/lpips_loss', lpips_loss.cpu().item())
-
+        self.log('metric/tv_loss', tv.cpu().item())
         self.log('loss', loss.cpu().item(), prog_bar=True)
         self.log('acc', acc.cpu().item(), prog_bar=True)
         self.log('msg_len', self.decoder_mask_len, prog_bar=True)
-
-        if batch_idx % 50 == 0:
-            print(f'[step {batch_idx}] acc={acc.cpu().item():.4f}  loss={loss.cpu().item():.4f}  msg_loss={msg_loss.cpu().item():.4f}  psnr={psnr.cpu().item():.1f}', flush=True)
-
-        # if acc >= 0.9:
-        #     self.decoder_mask_len += 1
-        #     self.decoder_mask_len = min(self.decoder_mask_len, self.msg_len)
 
         if batch_idx == 0:
             self.log_img("img", cover_img.detach().cpu(), n_epoch=1)
             self.log_img("wm_img", wm_img.detach().cpu(), n_epoch=1)
             self.log_img("mask", res['mask'].detach().cpu(), n_epoch=1)
             self.log_img("noised_img", noised_img.detach().cpu(), n_epoch=1)
-        pass
 
     def custom_valid_step(self, batch, batch_idx):
         self.eval()
@@ -572,7 +565,19 @@ class INRMark(EngineModel):
         pass
 
     def build_optimizers(self, args):
-        return torch.optim.AdamW(self.parameters(), lr=4e-4)
+        # v8: differential LR — struct_embedding learns slowly (stable embedding),
+        # decoder learns fast (adapts to current embedding)
+        lr = 4e-4
+        struct_params = list(self.struct_embedding.parameters())
+        decoder_params = list(self.decoder.parameters())
+        other_params = [p for n, p in self.named_parameters()
+                        if not n.startswith('struct_embedding') and not n.startswith('decoder')]
+        param_groups = [
+            {'params': struct_params, 'lr': lr * 0.3, 'name': 'struct_embedding'},
+            {'params': decoder_params, 'lr': lr * 3.0, 'name': 'decoder'},
+            {'params': other_params, 'lr': lr, 'name': 'other'},
+        ]
+        return torch.optim.RAdam(param_groups, lr=lr)
         pass
 
 
@@ -605,8 +610,8 @@ if __name__ == '__main__':
     args = Args().load("/home/light_sun/workspace/inrmark_2/inrsteg-final_v1/config/main.yaml")
 
     model = INRMark(args)
-    img_size = 256
-    msg_len = 64
+    img_size = 128 
+    msg_len = 30
     model(
         torch.clamp(torch.rand(2, img_size, img_size, 2), -1, 1),
         torch.rand(2, msg_len),

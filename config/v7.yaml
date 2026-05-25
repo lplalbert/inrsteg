@@ -1,0 +1,43 @@
+name: "ismark_v7_400_64"
+root_dir: "/home/lpl2025/lpl/inrsteg-final_v1/output1/v7_400_64"
+gpus: [0, 1]
+batch_size: 4
+val_batch_size: 8
+num_workers: 32
+val_num_workers: 8
+max_epochs: 20000
+find_unused_parameters: false
+ckpt_path: null
+resume: false
+lr: 0.001
+n_val_epoch: 5
+seed: 42
+
+train_data_path: "/mnt/xsj2023/Datasets/DIV2K/DIV2K_train"
+valid_data_path: "/mnt/xsj2023/Datasets/DIV2K/DIV2K_valid"
+
+img_size: 400
+msg_len: 64
+decoder_mask_len: 64
+feat_dim: 256
+hidden_dim: 128
+coord_map_dim: 32
+decoder_blocks: 4
+min_scale: 0.0
+
+use_bg: true
+use_fold: true
+cache: false
+use_global: false
+use_cell: false
+tunable_decoder: true
+fixed_psnr: 36
+inject_rgb: true
+noised: true
+use_wechat_screen: false
+use_jnd: true
+alpha: 0.02
+
+w_msg: 2
+w_img: 1
+w_lpips: 0.

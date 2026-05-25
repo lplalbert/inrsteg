@@ -1,0 +1,46 @@
+name: "ismark_v8_v2"
+root_dir: "/home/lpl2025/lpl/inrsteg-final_v1/output1/v8_v2"
+gpus: [0, 1]
+batch_size: 8
+val_batch_size: 32
+num_workers: 32
+val_num_workers: 8
+max_epochs: 20000
+find_unused_parameters: false
+ckpt_path: "/home/lpl2025/lpl/inrsteg-final_v1/output1/v8_v2/ismark_v8_v2/lightning_logs/version_2/checkpoints/last.ckpt"
+resume: true
+lr: 0.001
+n_val_epoch: 5
+seed: 42
+
+train_data_path: "/mnt/xsj2023/Datasets/DIV2K/DIV2K_train"
+valid_data_path: "/mnt/xsj2023/Datasets/DIV2K/DIV2K_valid"
+
+img_size: 256
+msg_len: 64
+decoder_mask_len: 64
+decoder_blocks: 2
+feat_dim: 256
+hidden_dim: 128
+coord_map_dim: 32
+target_canvas_size: 2048
+target_crop_size: 256
+min_scale: 0.125
+noise_crop_min_ratio: 0.125
+noise_crop_max_ratio: 1.0
+
+use_bg: true
+use_fold: true
+cache: false
+use_global: false
+use_cell: false
+tunable_decoder: true
+fixed_psnr: 36
+inject_rgb: true
+noised: true
+use_jnd: true
+alpha: 0.02
+
+w_msg: 2
+w_img: 1
+w_lpips: 0.

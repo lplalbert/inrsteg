@@ -1,0 +1,43 @@
+name: "ismark_v8"
+root_dir: "./output"
+gpus: [0, 1]
+batch_size: 32
+val_batch_size: 32
+num_workers: 32
+val_num_workers: 8
+max_epochs: 20000
+find_unused_parameters: false
+ckpt_path: null
+resume: false
+lr: 0.001
+n_val_epoch: 5
+seed: 42
+
+train_data_path: "/mnt/xsj2023/Datasets/DIV2K/DIV2K_train"
+valid_data_path: "/mnt/xsj2023/Datasets/DIV2K/DIV2K_valid"
+
+img_size: 128
+msg_len: 30
+feat_dim: 256
+hidden_dim: 128
+coord_map_dim: 32
+decoder_blocks: 2
+min_scale: 0.0
+
+use_bg: true
+use_fold: true
+cache: false
+use_global: false
+use_cell: false
+tunable_decoder: true
+fixed_psnr: 36
+inject_rgb: true
+noised: true
+use_jnd: true
+alpha: 0.02
+
+w_msg: 2
+w_img: 1
+w_lpips: 0.
+w_tv: 0.01
+progressive_noiser: true

@@ -1,0 +1,29 @@
+name: "Default" # name of the experiment
+root_dir: "./output" # root directory to save the experiment
+
+# number of gpus to use 
+# or "-1" for all available gpus 
+# or [0,1,2] for specific gpus
+gpus: 1 
+
+
+batch_size: 12 # training batch size
+val_batch_size: 12 # validation batch size
+num_workers: 12 # number of workers for data loading
+val_num_workers: 4 # number of workers for validation data loading
+
+max_epochs: 1000 # maximum number of epochs to train
+n_val_epoch: 5 # number of epochs to perform validation
+log_every_n_steps: 10 # number of steps to log the training information
+sync_batchnorm: null # whether to use sync batchnorm
+
+ckpt_path: null # path to the checkpoint file to load
+lr: 0.001 # learning rate
+
+
+seed: 42 # random seed
+find_unused_parameters: false # whether to find unused parameters in the model
+precision: 32 # precision of the model, 16 for mixed precision, 32 for single precision
+resume: false # whether to resume all training config from the checkpoint, if false only resume model weights
+log_every_n_steps: 10 # number of steps to log the training information
+
